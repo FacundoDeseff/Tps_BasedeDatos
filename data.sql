@@ -1,0 +1,2 @@
+-- TP5 - Datos iniciales y de prueba
+-- Incorporar aqui los INSERT necesarios para probar el trabajo.
