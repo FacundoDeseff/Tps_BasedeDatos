@@ -1,0 +1,12 @@
+CREATE TABLE categoria (
+    id_categoria BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE producto (
+    id_producto BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nombre VARCHAR(150) NOT NULL,
+    precio_lista NUMERIC (10,2) NOT NULL,
+    stock INTEGER NOT NULL DEFAULT 0,
+    id_categoria BIGINT NOT NULL
+);
