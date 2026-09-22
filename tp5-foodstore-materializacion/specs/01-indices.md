@@ -115,3 +115,63 @@ CREATE INDEX idx_pedido_fecha_activo
 - La ventana de 7 días es dinámica (`NOW() - INTERVAL '7 days'`), por lo que el índice siempre se consulta sobre un rango móvil — esto es eficiente con B-tree.
 - Si el volumen de pedidos activos de los últimos 7 días representa más del 20–30 % de la tabla, el planificador puede preferir Seq Scan igualmente. En ese caso se puede forzar la evaluación con `SET enable_seqscan = OFF` durante las pruebas.
 - Verificar el plan resultante con `EXPLAIN ANALYZE` tras crear el índice.
+
+---
+
+## Índice 3 — Detalle de pedido (ver ítems del carrito)
+
+### Consulta objetivo
+
+```sql
+SELECT dp.id_detalle, dp.producto_id, dp.cantidad, dp.subtotal, pr.nombre
+FROM detalle_pedido dp
+JOIN producto pr ON pr.id_producto = dp.producto_id
+WHERE dp.pedido_id = 150000 AND dp.eliminado = FALSE;
+```
+
+### Contexto y justificación
+
+| Atributo | Detalle |
+|---|---|
+| **Frecuencia** | Altísima — cada vez que un cliente consulta el detalle de su pedido |
+| **Tabla principal** | `detalle_pedido` (~200.000 filas efectivas) |
+| **Tabla secundaria** | `producto` (lookup por PK `id_producto`) |
+| **Filtros activos** | `dp.pedido_id = 150000` (igualdad exacta) y `dp.eliminado = FALSE` |
+| **JOIN** | `detalle_pedido.producto_id → producto.id_producto` (ya cubierto por la PK de `producto`) |
+| **Plan actual** | Seq Scan sobre `detalle_pedido` — recorre las 200.000 filas para localizar los ítems de un único pedido |
+
+### Problema
+
+Sin índice sobre `pedido_id`, PostgreSQL no tiene otra opción que recorrer **toda la tabla `detalle_pedido`** para encontrar las pocas filas que pertenecen al pedido consultado. Con frecuencia altísima y 200.000 filas, el costo es desproporcionado respecto al pequeño conjunto de resultados esperado (típicamente 1–20 ítems por pedido).
+
+El JOIN con `producto` ya usa la PK (`id_producto`), así que ese lado del plan es eficiente por defecto; el cuello de botella está íntegramente en el acceso a `detalle_pedido`.
+
+### Solución propuesta
+
+Crear un **índice B-tree parcial** sobre la columna `pedido_id`, restringido a las filas donde `eliminado = FALSE`:
+
+```sql
+CREATE INDEX idx_detalle_pedido_pedidoid_activo
+    ON detalle_pedido (pedido_id)
+    WHERE eliminado = FALSE;
+```
+
+**Por qué B-tree parcial:**
+- El filtro es una igualdad exacta (`pedido_id = valor`), que es el caso más eficiente para B-tree — acceso directo a la hoja del árbol.
+- La condición `WHERE eliminado = FALSE` excluye ítems borrados lógicamente, reduciendo el tamaño del índice y alineándolo con el predicado real de la consulta.
+- Con este índice, el plan pasa de **Seq Scan** a **Index Scan** sobre `detalle_pedido`, seguido de un **lookup por PK** en `producto` por cada fila devuelta — exactamente el plan más eficiente posible para esta consulta.
+
+### Resultado esperado
+
+| Métrica | Antes (Seq Scan) | Después (Index Scan + PK lookup) |
+|---|---|---|
+| Filas evaluadas en `detalle_pedido` | ~200.000 | Solo los ítems del pedido solicitado |
+| Tipo de plan | Seq Scan → Hash Join | Index Scan → Nested Loop |
+| Acceso a `producto` | Hash sobre toda la tabla | Lookup puntual por PK |
+| Costo estimado | Alto (proporcional a toda la tabla) | Mínimo (proporcional al resultado) |
+
+### Consideraciones adicionales
+
+- Si un pedido tiene muchos ítems (decenas), el planificador puede elegir **Bitmap Index Scan** en lugar de Index Scan — ambos son correctos y muy superiores al Seq Scan.
+- El índice también beneficia otras consultas que filtren por `pedido_id` sobre `detalle_pedido` (por ejemplo, cancelaciones o actualizaciones de carrito).
+- Verificar el plan resultante con `EXPLAIN ANALYZE` tras crear el índice.
