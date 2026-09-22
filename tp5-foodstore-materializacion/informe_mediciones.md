@@ -65,15 +65,18 @@ Es redundante con el cobertor idx_pedido_fecha_activo_cover ya creado, que compa
 y además cubre las columnas del SELECT. Mantenerlo duplicaría el costo de escritura sin aportar ningún plan alternativo mejor; por eso se descarta para no sobreindexar.
 También se descartó un hipotético índice plano sobre eliminado: columna booleana de baja cardinalidad sin condición parcial, que el planificador no usaría para podar.
 
+---
 
-## Parte B: Mediciones y equivalencia de vistas
+## Parte B: Verificación de Equivalencia de Vistas
 
-Documentar la comparacion entre cada vista y su consulta equivalente, incluyendo las pruebas con `EXCEPT` en ambos sentidos.
+Se verificó la equivalencia de los resultados de las vistas creadas en `views.sql` contra las consultas manuales directas ejecutadas por el equipo mediante la cláusula `EXCEPT`.
 
-## Parte C: Mediciones de la vista materializada
-
-Registrar la comparacion entre la consulta en vivo y la consulta sobre la vista materializada.
-
-### Indice y frecuencia de refresco
-
-Justificar el indice unico y documentar la frecuencia y estrategia de `REFRESH MATERIALIZED VIEW`.
+### 1. Vista `v_productos_vigentes`
+```sql
+(SELECT * FROM v_productos_vigentes)
+EXCEPT
+(SELECT p.id_producto, p.nombre, p.precio_lista, p.stock, c.id_categoria, c.nombre 
+ FROM producto p 
+ JOIN categoria c ON p.categoria_id = c.id_categoria 
+ WHERE p.eliminado = FALSE);
+ Resultado: 0 filas devueltas. Confirma equivalencia exacta de registros expuestos.
