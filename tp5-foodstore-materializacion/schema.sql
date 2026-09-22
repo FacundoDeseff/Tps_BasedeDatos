@@ -1,2 +1,0 @@
--- TP5 - Esquema de la base de datos
--- Incorporar aqui la definicion de tablas, restricciones y relaciones.
