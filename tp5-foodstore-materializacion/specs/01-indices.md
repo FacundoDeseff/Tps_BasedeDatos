@@ -59,3 +59,59 @@ CREATE INDEX idx_producto_nombre_activo
       WHERE eliminado = FALSE;
   ```
 - Verificar el plan resultante con `EXPLAIN ANALYZE` tras crear el índice.
+
+---
+
+## Índice 2 — Reporte de ventas semanal
+
+### Consulta objetivo
+
+```sql
+SELECT id_pedido, usuario_id, fecha, total
+FROM pedido
+WHERE fecha >= NOW() - INTERVAL '7 days' AND eliminado = FALSE;
+```
+
+### Contexto y justificación
+
+| Atributo | Detalle |
+|---|---|
+| **Frecuencia** | Media-alta — corre en cada cierre semanal diario |
+| **Tabla** | `pedido` (~200.000 filas efectivas) |
+| **Filtros activos** | `fecha >= NOW() - INTERVAL '7 days'` (rango temporal) y `eliminado = FALSE` |
+| **JOINs / ORDER BY** | Sin JOIN; ORDER BY implícito por fecha descendente en la salida |
+| **Plan actual** | Seq Scan sobre `pedido` — recorre las 200.000 filas en cada ejecución |
+
+### Problema
+
+Sin índice, PostgreSQL evalúa **todas las filas de `pedido`** para encontrar los pedidos de los últimos 7 días. Con 200.000 filas y una frecuencia de ejecución diaria, el costo acumulado es significativo. Los filtros de rango sobre columnas de tipo fecha/timestamp son el caso de uso clásico para un índice B-tree.
+
+### Solución propuesta
+
+Crear un **índice B-tree parcial** sobre la columna `fecha`, restringido a las filas donde `eliminado = FALSE`:
+
+```sql
+CREATE INDEX idx_pedido_fecha_activo
+    ON pedido (fecha)
+    WHERE eliminado = FALSE;
+```
+
+**Por qué B-tree parcial:**
+- B-tree soporta de forma nativa los operadores de rango (`>=`, `<=`, `BETWEEN`), por lo que es el tipo correcto para filtros sobre `fecha`.
+- La condición `WHERE eliminado = FALSE` excluye los pedidos borrados lógicamente del índice, reduciendo su tamaño y manteniéndolo alineado con el predicado de la consulta.
+- Al coincidir exactamente el predicado del índice con el filtro de la consulta, el planificador puede usar **Bitmap Index Scan** o **Index Scan**, evitando el Seq Scan.
+- Si la consulta final necesita ORDER BY fecha DESC, el índice también puede servir el orden sin un paso adicional de Sort.
+
+### Resultado esperado
+
+| Métrica | Antes (Seq Scan) | Después (Bitmap/Index Scan) |
+|---|---|---|
+| Filas evaluadas | ~200.000 | Solo los pedidos de los últimos 7 días |
+| Tipo de plan | Sequential Scan | Bitmap Index Scan / Index Scan |
+| Costo estimado | Alto (proporcional a toda la tabla) | Bajo (proporcional al rango temporal) |
+
+### Consideraciones adicionales
+
+- La ventana de 7 días es dinámica (`NOW() - INTERVAL '7 days'`), por lo que el índice siempre se consulta sobre un rango móvil — esto es eficiente con B-tree.
+- Si el volumen de pedidos activos de los últimos 7 días representa más del 20–30 % de la tabla, el planificador puede preferir Seq Scan igualmente. En ese caso se puede forzar la evaluación con `SET enable_seqscan = OFF` durante las pruebas.
+- Verificar el plan resultante con `EXPLAIN ANALYZE` tras crear el índice.
