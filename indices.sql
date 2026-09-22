@@ -1,0 +1,4 @@
+-- TP5 - Parte A: Indices
+--
+-- Agregar aqui los CREATE INDEX definidos a partir de specs/01-indices.md.
+-- Mantener las sentencias idempotentes cuando corresponda.
