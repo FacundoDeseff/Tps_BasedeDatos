@@ -75,9 +75,104 @@ Se compararon cada vista con su consulta equivalente mediante `EXCEPT` en ambos 
 |---|---|---|---|
 | `v_productos_vigentes` | `vista EXCEPT manual` / `manual EXCEPT vista` | 0 filas / 0 filas | Equivalentes |
 | `v_pedidos_usuario` | `vista EXCEPT manual` / `manual EXCEPT vista` | 0 filas / 0 filas | Equivalentes |
+| `v_usuarios_seguros` | `vista EXCEPT manual` / `manual EXCEPT vista` | 0 filas / 0 filas | Equivalentes; vista de menor privilegio |
 | `v_detalle_pedido_producto` | `vista EXCEPT manual` / `manual EXCEPT vista` | 0 filas / 0 filas | Equivalentes |
 
 Se cumplen las equivalencias exactas, esto valida que la vista replica a la consulta definida.
+
+### Consultas de equivalencia ejecutadas
+
+#### 1. `v_productos_vigentes`
+
+```sql
+-- Vista EXCEPT consulta manual
+(SELECT * FROM v_productos_vigentes)
+EXCEPT
+(SELECT p.id_producto, p.nombre AS producto_nombre, p.precio_lista, p.stock,
+                c.id_categoria, c.nombre AS categoria_nombre
+ FROM producto p
+ JOIN categoria c ON p.id_categoria = c.id_categoria
+ WHERE p.eliminado = FALSE
+     AND c.eliminado = FALSE);
+
+-- Consulta manual EXCEPT vista
+(SELECT p.id_producto, p.nombre AS producto_nombre, p.precio_lista, p.stock,
+                c.id_categoria, c.nombre AS categoria_nombre
+ FROM producto p
+ JOIN categoria c ON p.id_categoria = c.id_categoria
+ WHERE p.eliminado = FALSE
+     AND c.eliminado = FALSE)
+EXCEPT
+(SELECT * FROM v_productos_vigentes);
+```
+
+#### 2. `v_pedidos_usuario`
+
+```sql
+-- Vista EXCEPT consulta manual
+(SELECT * FROM v_pedidos_usuario)
+EXCEPT
+(SELECT p.id_pedido, p.fecha, p.total, u.id_usuario,
+                u.nombre AS usuario_nombre, u.apellido AS usuario_apellido
+ FROM pedido p
+ JOIN usuario u ON p.usuario_id = u.id_usuario
+ WHERE p.eliminado = FALSE);
+
+-- Consulta manual EXCEPT vista
+(SELECT p.id_pedido, p.fecha, p.total, u.id_usuario,
+                u.nombre AS usuario_nombre, u.apellido AS usuario_apellido
+ FROM pedido p
+ JOIN usuario u ON p.usuario_id = u.id_usuario
+ WHERE p.eliminado = FALSE)
+EXCEPT
+(SELECT * FROM v_pedidos_usuario);
+```
+
+#### 3. `v_usuarios_seguros`
+
+```sql
+-- Vista EXCEPT consulta manual
+(SELECT * FROM v_usuarios_seguros)
+EXCEPT
+(SELECT u.id_usuario, u.nombre, u.apellido
+ FROM usuario u
+ WHERE u.eliminado = FALSE);
+
+-- Consulta manual EXCEPT vista
+(SELECT u.id_usuario, u.nombre, u.apellido
+ FROM usuario u
+ WHERE u.eliminado = FALSE)
+EXCEPT
+(SELECT * FROM v_usuarios_seguros);
+```
+
+#### 4. `v_detalle_pedido_producto`
+
+```sql
+-- Vista EXCEPT consulta manual
+(SELECT * FROM v_detalle_pedido_producto)
+EXCEPT
+(SELECT dp.pedido_id AS id_pedido, dp.id_detalle, dp.producto_id,
+                pr.nombre AS producto_nombre, dp.cantidad, dp.subtotal
+ FROM detalle_pedido dp
+ JOIN pedido p ON dp.pedido_id = p.id_pedido
+ JOIN producto pr ON dp.producto_id = pr.id_producto
+ WHERE dp.eliminado = FALSE
+     AND p.eliminado = FALSE
+     AND pr.eliminado = FALSE);
+
+-- Consulta manual EXCEPT vista
+(SELECT dp.pedido_id AS id_pedido, dp.id_detalle, dp.producto_id,
+                pr.nombre AS producto_nombre, dp.cantidad, dp.subtotal
+ FROM detalle_pedido dp
+ JOIN pedido p ON dp.pedido_id = p.id_pedido
+ JOIN producto pr ON dp.producto_id = pr.id_producto
+ WHERE dp.eliminado = FALSE
+     AND p.eliminado = FALSE
+     AND pr.eliminado = FALSE)
+EXCEPT
+(SELECT * FROM v_detalle_pedido_producto);
+```
 
 
 ---

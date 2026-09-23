@@ -27,7 +27,16 @@ FROM pedido p
 JOIN usuario u ON p.usuario_id = u.id_usuario
 WHERE p.eliminado = FALSE;
 
--- 3. Detalle de un pedido con el nombre del producto
+-- 3. Usuarios seguros sin información sensible
+CREATE OR REPLACE VIEW v_usuarios_seguros AS
+SELECT
+  u.id_usuario,
+  u.nombre,
+  u.apellido
+FROM usuario u
+WHERE u.eliminado = FALSE;
+
+-- 4. Detalle de un pedido con el nombre del producto
 CREATE OR REPLACE VIEW v_detalle_pedido_producto AS
 SELECT 
     dp.pedido_id AS id_pedido,

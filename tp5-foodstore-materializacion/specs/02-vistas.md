@@ -6,7 +6,8 @@ Crear vistas para simplificar el acceso a reportes y aplicar criterios de seguri
 ## Vistas a definir
 1. **`v_productos_vigentes`**: Exponer productos activos (`eliminado = FALSE`) con el nombre de su categoría.
 2. **`v_pedidos_usuario`**: Exponer pedidos con los datos del usuario asociado.
-3. **`v_detalle_pedido_producto`**: Exponer el detalle de un pedido con el nombre del producto (ítems de pedido vigentes).
+3. **`v_usuarios_seguros`**: Exponer únicamente los datos no sensibles de usuarios vigentes para permitir otorgar `SELECT` sin exponer la tabla base.
+4. **`v_detalle_pedido_producto`**: Exponer el detalle de un pedido con el nombre del producto (ítems de pedido vigentes).
 
 ## Especificación detallada
 
@@ -20,7 +21,13 @@ Crear vistas para simplificar el acceso a reportes y aplicar criterios de seguri
 - Filtro de vigencia: `p.eliminado = FALSE`
 - Seguridad: Exponer únicamente datos necesarios del usuario. **No** debe exponerse ningún campo sensible (no existe `contraseña` en el esquema; tampoco se incluyen otros campos innecesarios).
 
-### 3. v_detalle_pedido_producto
+### 3. v_usuarios_seguros
+- Columnas a exponer: `id_usuario`, `nombre`, `apellido`.
+- Filtro de vigencia: `u.eliminado = FALSE`.
+- Seguridad: No expone contraseñas ni información sensible. El esquema actual no contiene una columna de contraseña.
+- Justificación: Permite otorgar `SELECT` sobre los datos operativos mínimos sin otorgar acceso directo a la tabla `usuario`.
+
+### 4. v_detalle_pedido_producto
 - Columnas a exponer: `id_pedido` (pedido al que pertenece el ítem), `id_detalle`, `producto_id`, `producto_nombre` (alias de `producto.nombre`), `cantidad`, `subtotal`
 - Filtros de vigencia: `dp.eliminado = FALSE AND p.eliminado = FALSE AND pr.eliminado = FALSE`. Esto asegura que solo se muestren ítems vigentes de pedidos vigentes y productos vigentes.
 - Seguridad: Vista orientada a reporte (solo datos operativos). No expone información sensible del usuario. Se cumple el principio de **mínima exposición** (solo lo necesario para el reporte).
