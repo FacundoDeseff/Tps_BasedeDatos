@@ -56,7 +56,8 @@ WHERE dp.eliminado = FALSE
 -- TP5 - Parte C: Vista materializada
 
 -- Vista materializada de facturación agregada por categoría y mes
-CREATE MATERIALIZED VIEW IF NOT EXISTS vm_facturacion_categoria_mes AS
+DROP MATERIALIZED VIEW IF EXISTS vm_facturacion_categoria_mes;
+CREATE MATERIALIZED VIEW vm_facturacion_categoria_mes AS
 SELECT 
     c.id_categoria,
     c.nombre AS categoria_nombre,
