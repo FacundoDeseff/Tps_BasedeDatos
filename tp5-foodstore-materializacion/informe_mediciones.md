@@ -69,14 +69,49 @@ También se descartó un hipotético índice plano sobre eliminado: columna bool
 
 ## Parte B: Verificación de Equivalencia de Vistas
 
-Se verificó la equivalencia de los resultados de las vistas creadas en `views.sql` contra las consultas manuales directas ejecutadas por el equipo mediante la cláusula `EXCEPT`.
+Se compararon cada vista con su consulta equivalente mediante `EXCEPT` en ambos sentidos. Criterio: equivalencia exacta si ambos `EXCEPT` devuelven 0 filas.
 
-### 1. Vista `v_productos_vigentes`
-```sql
-(SELECT * FROM v_productos_vigentes)
-EXCEPT
-(SELECT p.id_producto, p.nombre, p.precio_lista, p.stock, c.id_categoria, c.nombre 
- FROM producto p 
- JOIN categoria c ON p.categoria_id = c.id_categoria 
- WHERE p.eliminado = FALSE);
- Resultado: 0 filas devueltas. Confirma equivalencia exacta de registros expuestos.
+| Vista | Prueba | Resultado | Observación |
+|---|---|---|---|
+| `v_productos_vigentes` | `vista EXCEPT manual` / `manual EXCEPT vista` | 0 filas / 0 filas | Equivalentes |
+| `v_pedidos_usuario` | `vista EXCEPT manual` / `manual EXCEPT vista` | 0 filas / 0 filas | Equivalentes |
+| `v_detalle_pedido_producto` | `vista EXCEPT manual` / `manual EXCEPT vista` | 0 filas / 0 filas | Equivalentes |
+
+Se cumplen las equivalencias exactas, esto valida que la vista replica a la consulta definida.
+
+
+---
+
+## Parte C: Vista Materializada
+
+### Reporte elegido y creación
+
+Reporte agregado costoso: **facturación por categoría y mes** (identificado en las consultas analíticas de la Semana 4). Requiere 3 JOINs sobre ~198.000 filas de `detalle_pedido`, sort a disco y agregaciones `COUNT(DISTINCT)` + `SUM`, pero devuelve solo 13 filas.
+
+Creada en `views.sql` con `WITH DATA` e índice único compuesto.
+El índice único sobre (id_categoria, mes) es obligatorio: PostgreSQL exige un índice único que cubra la cláusula GROUP BY para habilitar REFRESH MATERIALIZED VIEW CONCURRENTLY.
+
+### Medición de Consulta vs Vista Materializada
+
+Se midió la consulta original ejecutada directamente sobre las tablas contra la consulta sobre la vista materializada, con el mismo dataset.
+
+Caso |	Corrida 1 (ms) |	Corrida 2 (ms) |	Corrida 3 (ms) |	Promedio (ms) |
+Consulta original (sin materializar) |	910.482 |	932.041 |	938.331 | 926.95 |
+Vista materializada (vm_facturacion_categoria_mes) |	0.040 |	0.040 |	0.040 |	0.040 |
+
+Resultado: la vista materializada responde ~23.000× más rápido (0,040 ms vs 927 ms).
+
+### Frecuencia de REFRESH MATERIALIZED VIEW
+
+Frecuencia sugerida: 1 vez al día, en ventana nocturna (fuera de pico):
+REFRESH MATERIALIZED VIEW CONCURRENTLY vm_facturacion_categoria_mes;
+
+Justificación:
+- El reporte es agregado histórico (facturación por categoría y mes); los pedidos ya facturados no se modifican retroactivamente con frecuencia.
+- El REFRESH recalcula el agregado completo sobre ~198.000 filas, por lo que ejecutarlo ante cada nuevo pedido sería costoso e innecesario.
+- El uso esperado es de reporte gerencial/analítico, consultado por lotes (diario/semanal), no en tiempo real.
+- El índice único (id_categoria, mes) habilita CONCURRENTLY, de modo que las lecturas no se bloquean durante el refresco.
+- Si el volumen creciera, podría aumentarse a cada 6–12 horas; con el volumen actual, el refresco diario es suficiente.
+
+### Qué implica para los usuarios:
+El dato no se actualiza en cada operación: existe latencia de frescura. Los pedidos ingresados después del último refresco no aparecerán en el reporte hasta la próxima ejecución del REFRESH; el reporte siempre refleja el estado "al corte del último refresco". Este compromiso es aceptable para un reporte analítico (menor tiempo de respuesta a cambio de frescura acotada), pero no lo sería para una consulta transaccional que exija ver los últimos pedidos al instante.

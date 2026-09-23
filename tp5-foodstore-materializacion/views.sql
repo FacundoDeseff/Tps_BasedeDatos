@@ -11,9 +11,10 @@ SELECT
     c.nombre AS categoria_nombre
 FROM producto p
 JOIN categoria c ON p.id_categoria = c.id_categoria
-WHERE p.eliminado = FALSE;
+WHERE p.eliminado = FALSE
+  AND c.eliminado = FALSE;  
 
--- 2. Pedidos con datos del usuario (Aplica criterio de seguridad: expone solo nombre/apellido)
+-- 2. Pedidos con datos del usuario
 CREATE OR REPLACE VIEW v_pedidos_usuario AS
 SELECT 
     p.id_pedido,
@@ -26,18 +27,21 @@ FROM pedido p
 JOIN usuario u ON p.usuario_id = u.id_usuario
 WHERE p.eliminado = FALSE;
 
--- 3. Detalle de pedido con el nombre del producto
+-- 3. Detalle de un pedido con el nombre del producto
 CREATE OR REPLACE VIEW v_detalle_pedido_producto AS
 SELECT 
+    dp.pedido_id AS id_pedido,
     dp.id_detalle,
-    dp.pedido_id,
     dp.producto_id,
     pr.nombre AS producto_nombre,
     dp.cantidad,
     dp.subtotal
 FROM detalle_pedido dp
+JOIN pedido p ON dp.pedido_id = p.id_pedido
 JOIN producto pr ON dp.producto_id = pr.id_producto
-WHERE dp.eliminado = FALSE;
+WHERE dp.eliminado = FALSE
+  AND p.eliminado = FALSE
+  AND pr.eliminado = FALSE;
 
 
 -- TP5 - Parte C: Vista materializada
