@@ -4,7 +4,9 @@ Repositorio de trabajos prácticos de la materia.
 
 ## Trabajos Prácticos
 
-* **TP 1 - Food Store**: Modelado inicial de base de datos.
-* **TP 2 - Concurrencia y Restricciones**: Transacciones concurrentes, bloqueos y restricciones de integridad.
-* **TP 3 - Optimización Food Store**: Carga masiva (270k+ tuplas), análisis con EXPLAIN ANALYZE, indexación y equivalencia formal.
-* **TP 4 - Analítica Food Store**: Consultas analíticas, optimización de queries y reporte PDF.
+* **TP 1 - Food Store:** Modelado inicial de base de datos.
+* **TP 2 - Concurrencia y Restricciones:** Transacciones concurrentes, bloqueos y restricciones de integridad.
+* **TP 3 - Optimización Food Store:** Carga masiva (270k+ tuplas), análisis con EXPLAIN ANALYZE, indexación y equivalencia formal.
+* **TP 4 - Analítica Food Store:** Consultas analíticas, optimización de queries y reporte PDF.
+* **TP 5 - Materialización Food Store:** Vistas materializadas y optimización de rendimiento.
+* **TP 6 - FNBC y Desnormalización Food Store:** Normalización a Forma Normal de Boyce-Codd (FNBC), vista materializada con índice y scripts de auditoría/conciliación de datos.
