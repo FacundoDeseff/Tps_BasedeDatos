@@ -1,4 +1,6 @@
 -- PARTE 1: NORMALIZACIÓN BCNF
+-- Supuesto consigna p.3: lote(id), deposito(id), usuario(id) ya existen. Se omiten REFERENCES para script autocontenido.
+-- Equivalente formal: lote_id REFERENCES lote(id), deposito_id REFERENCES deposito(id), responsable_control_id REFERENCES usuario(id)
 
 -- 1. Tabla original e instancia de prueba
 CREATE TABLE IF NOT EXISTS control_lote_almacen (

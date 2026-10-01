@@ -29,6 +29,13 @@ WHERE dp.eliminado = FALSE
 GROUP BY c.nombre, ped.fecha;
 
 CREATE INDEX IF NOT EXISTS idx_mv_top_cat_fecha ON mv_top_categorias_diarias(fecha);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_mv_top_cat ON mv_top_categorias_diarias(categoria, fecha);
+
+-- 2b. Mecanismo de sincronización (punto 5.2.c)
+-- Manual (no bloquea lecturas gracias al índice UNIQUE):
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY mv_top_categorias_diarias;
+-- Automático diario 23hs con pg_cron:
+-- SELECT cron.schedule('refresh_top_cat','0 23 * * *','REFRESH MATERIALIZED VIEW CONCURRENTLY mv_top_categorias_diarias');
 
 -- 3. Consulta optimizada (Medición DESPUÉS)
 EXPLAIN ANALYZE
