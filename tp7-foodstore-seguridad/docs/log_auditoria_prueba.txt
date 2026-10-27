@@ -1,0 +1,62 @@
+# Fragmento del log del servidor - prueba de auditoría (Parte B)
+# Origen: C:/Program Files/PostgreSQL/17/data/log/postgresql-2026-10-27_000000.log
+# Líneas 305 a 341 y 344 del archivo, 2026-10-27, zona horaria -03.
+# Configuración activa: log_connections=on, log_disconnections=on,
+#   log_statement='all', log_line_prefix='%m [%p] user=%u,db=%d,app=%a,client=%h '
+# Ediciones respecto del archivo original:
+#   - El archivo original está en Windows-1252; se lo pasó a UTF-8 restaurando
+#     los acentos (conexión, autentificación, línea, desconexión, etc.).
+#   - Se omitieron las dos líneas de checkpoint (16:00:06), ajenas a la prueba.
+#   - No se tocó ninguna otra parte del texto. No hay contraseñas en el
+#     fragmento; los nombres de usuario y el cliente (::1) son de la máquina local.
+#
+# Secuencia ejecutada:
+#   Sesión 1 (app_web):      SELECT 'INICIO_B'; lectura de categoria; SELECT sobre pedido (denegado)
+#   Sesión 2 (admin_datos):  INSERT, UPDATE y DELETE sobre categoria
+#   Sesión 3:                inicio de sesión fallido con un rol inexistente
+#   Sesión 4:                inicio de sesión fallido con app_web y clave incorrecta
+#   Sesión 5 (app_web):      SELECT 'FIN_B';
+# Las líneas "conexión recibida" con user=[desconocido] anteriores a cada sesión
+# válida corresponden a que psql abre una primera conexión, recibe el pedido de
+# contraseña y se reconecta con ella. La línea de las 15:56:02 es un intento
+# fallido de app_web anterior a INICIO_B que no formaba parte de la secuencia.
+# ---------------------------------------------------------------------------
+
+2026-10-27 15:55:48.930 -03 [35716] user=[desconocido],db=[desconocido],app=[desconocido],client=::1 LOG:  conexión recibida: host=::1 port=23122
+2026-10-27 15:56:02.148 -03 [37044] user=[desconocido],db=[desconocido],app=[desconocido],client=::1 LOG:  conexión recibida: host=::1 port=16878
+2026-10-27 15:56:02.178 -03 [37044] user=app_web,db=copia_trabajo,app=[desconocido],client=::1 FATAL:  la autentificación password falló para el usuario «app_web»
+2026-10-27 15:56:02.178 -03 [37044] user=app_web,db=copia_trabajo,app=[desconocido],client=::1 DETALLE:  La conexión coincidió con el archivo «C:/Program Files/PostgreSQL/17/data/pg_hba.conf» línea 117: «host    all             all             ::1/128                 scram-sha-256»
+2026-10-27 15:56:22.257 -03 [37324] user=[desconocido],db=[desconocido],app=[desconocido],client=::1 LOG:  conexión recibida: host=::1 port=45756
+2026-10-27 15:56:40.726 -03 [36244] user=[desconocido],db=[desconocido],app=[desconocido],client=::1 LOG:  conexión recibida: host=::1 port=45781
+2026-10-27 15:56:43.514 -03 [35616] user=[desconocido],db=[desconocido],app=[desconocido],client=::1 LOG:  conexión recibida: host=::1 port=45785
+2026-10-27 15:56:43.544 -03 [35616] user=app_web,db=copia_trabajo,app=[desconocido],client=::1 LOG:  conexión autenticada: identidad=«app_web» método=scram-sha-256 (C:/Program Files/PostgreSQL/17/data/pg_hba.conf:117)
+2026-10-27 15:56:43.544 -03 [35616] user=app_web,db=copia_trabajo,app=[desconocido],client=::1 LOG:  conexión autorizada: usuario=app_web base_de_datos=copia_trabajo nombre_de_aplicación=psql
+2026-10-27 15:56:57.037 -03 [35616] user=app_web,db=copia_trabajo,app=psql,client=::1 LOG:  sentencia: SELECT 'INICIO_B';
+2026-10-27 15:56:57.378 -03 [35616] user=app_web,db=copia_trabajo,app=psql,client=::1 LOG:  sentencia: SELECT id_categoria, nombre FROM categoria ORDER BY id_categoria LIMIT 5;
+2026-10-27 15:56:59.072 -03 [35616] user=app_web,db=copia_trabajo,app=psql,client=::1 LOG:  sentencia: SELECT * FROM pedido LIMIT 1;
+2026-10-27 15:56:59.077 -03 [35616] user=app_web,db=copia_trabajo,app=psql,client=::1 ERROR:  permiso denegado a la tabla pedido
+2026-10-27 15:56:59.077 -03 [35616] user=app_web,db=copia_trabajo,app=psql,client=::1 SENTENCIA:  SELECT * FROM pedido LIMIT 1;
+2026-10-27 15:57:11.828 -03 [35616] user=app_web,db=copia_trabajo,app=psql,client=::1 LOG:  desconexión: duración de sesión: 0:00:28.344 usuario=app_web base=copia_trabajo host=::1 port=45785
+2026-10-27 15:57:22.381 -03 [38148] user=[desconocido],db=[desconocido],app=[desconocido],client=::1 LOG:  conexión recibida: host=::1 port=37992
+2026-10-27 15:57:27.106 -03 [38312] user=[desconocido],db=[desconocido],app=[desconocido],client=::1 LOG:  conexión recibida: host=::1 port=37999
+2026-10-27 15:57:27.141 -03 [38312] user=admin_datos,db=copia_trabajo,app=[desconocido],client=::1 LOG:  conexión autenticada: identidad=«admin_datos» método=scram-sha-256 (C:/Program Files/PostgreSQL/17/data/pg_hba.conf:117)
+2026-10-27 15:57:27.141 -03 [38312] user=admin_datos,db=copia_trabajo,app=[desconocido],client=::1 LOG:  conexión autorizada: usuario=admin_datos base_de_datos=copia_trabajo nombre_de_aplicación=psql
+2026-10-27 15:57:40.260 -03 [38312] user=admin_datos,db=copia_trabajo,app=psql,client=::1 LOG:  sentencia: INSERT INTO categoria (nombre) VALUES ('__AUDITORIA_TEST__');
+2026-10-27 15:57:40.274 -03 [38312] user=admin_datos,db=copia_trabajo,app=psql,client=::1 LOG:  sentencia: UPDATE categoria SET nombre = '__AUDITORIA_TEST_ACTUALIZADA__' WHERE nombre = '__AUDITORIA_TEST__';
+2026-10-27 15:57:40.988 -03 [38312] user=admin_datos,db=copia_trabajo,app=psql,client=::1 LOG:  sentencia: DELETE FROM categoria WHERE nombre = '__AUDITORIA_TEST_ACTUALIZADA__';
+2026-10-27 15:57:51.782 -03 [38312] user=admin_datos,db=copia_trabajo,app=psql,client=::1 LOG:  desconexión: duración de sesión: 0:00:24.713 usuario=admin_datos base=copia_trabajo host=::1 port=37999
+2026-10-27 15:58:13.433 -03 [38676] user=[desconocido],db=[desconocido],app=[desconocido],client=::1 LOG:  conexión recibida: host=::1 port=40274
+2026-10-27 15:58:18.161 -03 [38884] user=[desconocido],db=[desconocido],app=[desconocido],client=::1 LOG:  conexión recibida: host=::1 port=12518
+2026-10-27 15:58:18.190 -03 [38884] user=usuario_inexistente,db=copia_trabajo,app=[desconocido],client=::1 FATAL:  la autentificación password falló para el usuario «usuario_inexistente»
+2026-10-27 15:58:18.190 -03 [38884] user=usuario_inexistente,db=copia_trabajo,app=[desconocido],client=::1 DETALLE:  No existe el rol «usuario_inexistente».
+	La conexión coincidió con el archivo «C:/Program Files/PostgreSQL/17/data/pg_hba.conf» línea 117: «host    all             all             ::1/128                 scram-sha-256»
+2026-10-27 15:58:35.748 -03 [36404] user=[desconocido],db=[desconocido],app=[desconocido],client=::1 LOG:  conexión recibida: host=::1 port=12541
+2026-10-27 15:58:51.166 -03 [32388] user=[desconocido],db=[desconocido],app=[desconocido],client=::1 LOG:  conexión recibida: host=::1 port=12562
+2026-10-27 15:58:51.196 -03 [32388] user=app_web,db=copia_trabajo,app=[desconocido],client=::1 FATAL:  la autentificación password falló para el usuario «app_web»
+2026-10-27 15:58:51.196 -03 [32388] user=app_web,db=copia_trabajo,app=[desconocido],client=::1 DETALLE:  La conexión coincidió con el archivo «C:/Program Files/PostgreSQL/17/data/pg_hba.conf» línea 117: «host    all             all             ::1/128                 scram-sha-256»
+2026-10-27 15:59:08.774 -03 [38492] user=[desconocido],db=[desconocido],app=[desconocido],client=::1 LOG:  conexión recibida: host=::1 port=63478
+2026-10-27 15:59:16.258 -03 [37924] user=[desconocido],db=[desconocido],app=[desconocido],client=::1 LOG:  conexión recibida: host=::1 port=63488
+2026-10-27 15:59:16.288 -03 [37924] user=app_web,db=copia_trabajo,app=[desconocido],client=::1 LOG:  conexión autenticada: identidad=«app_web» método=scram-sha-256 (C:/Program Files/PostgreSQL/17/data/pg_hba.conf:117)
+2026-10-27 15:59:16.288 -03 [37924] user=app_web,db=copia_trabajo,app=[desconocido],client=::1 LOG:  conexión autorizada: usuario=app_web base_de_datos=copia_trabajo nombre_de_aplicación=psql
+2026-10-27 15:59:39.580 -03 [37924] user=app_web,db=copia_trabajo,app=psql,client=::1 LOG:  sentencia: SELECT 'FIN_B';
+2026-10-27 16:00:09.048 -03 [37924] user=app_web,db=copia_trabajo,app=psql,client=::1 LOG:  desconexión: duración de sesión: 0:00:52.821 usuario=app_web base=copia_trabajo host=::1 port=63488

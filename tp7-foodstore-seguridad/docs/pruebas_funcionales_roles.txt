@@ -1,0 +1,180 @@
+Pruebas funcionales de roles (Parte A) - registro de la sesión de psql
+Base: copia_trabajo - PostgreSQL 17.11
+Objetivo: comprobar que los permisos otorgados permiten lo previsto y que los
+intentos indebidos fallan de verdad (design.md §13.7).
+Las claves de app_web y admin_datos se definieron con \password y no figuran
+en ningún archivo del repositorio.
+
+===============================================================================
+1. Conectado como app_web  (psql -U app_web -h localhost -d copia_trabajo)
+===============================================================================
+copia_trabajo=> SELECT current_user;
+ current_user
+--------------
+ app_web
+(1 fila)
+
+copia_trabajo=> SELECT * FROM categoria LIMIT 2;
+ id_categoria |  nombre   | eliminado
+--------------+-----------+-----------
+            1 | Pizzas    | f
+            2 | Empanadas | f
+(2 filas)
+
+copia_trabajo=> SELECT * FROM pedido LIMIT 1;
+ERROR:  permiso denegado a la tabla pedido
+copia_trabajo=> SELECT password_hash FROM usuario LIMIT 1;
+ERROR:  permiso denegado a la tabla usuario
+copia_trabajo=> UPDATE categoria SET nombre = nombre WHERE id_categoria = 1;
+ERROR:  permiso denegado a la tabla categoria
+copia_trabajo=> SELECT fn_resetear_password(1, 'x');
+ERROR:  permiso denegado a la función fn_resetear_password
+copia_trabajo=> SELECT fn_autenticar('nadie@example.invalid', 'x');
+ fn_autenticar
+---------------
+
+(1 fila)
+
+copia_trabajo=> BEGIN;
+BEGIN
+copia_trabajo=*> INSERT INTO pedido (usuario_id, total) VALUES (1, 0) RETURNING id_pedido;
+ id_pedido
+-----------
+    200001
+(1 fila)
+
+INSERT 0 1
+copia_trabajo=*> ROLLBACK;
+ROLLBACK
+copia_trabajo=> GRANT admin_datos TO app_web;
+ERROR:  se ha denegado el permiso para otorgar el rol «admin_datos»
+DETALLE:  Sólo los roles con la opción ADMIN en el rol «admin_datos» pueden otorgar este rol.
+
+Resultado: cumple lo previsto.
+- Lee el catálogo, pero no pedido, ni password_hash, ni escribe en categoria.
+- No puede ejecutar fn_resetear_password (función reservada a admin_datos).
+- fn_autenticar con un email inexistente devuelve NULL y no modifica datos.
+- INSERT ... RETURNING id_pedido funciona gracias a SELECT(id_pedido) por columna.
+  El id 200001 queda consumido aunque se hizo ROLLBACK: las secuencias no se
+  revierten en PostgreSQL.
+- EL INTENTO DE ESCALAMIENTO FALLA: GRANT admin_datos TO app_web es rechazado
+  porque app_web no tiene la opción ADMIN sobre admin_datos.
+
+===============================================================================
+2. rol_soporte y rol_reportes  (como postgres, con SET ROLE)
+===============================================================================
+copia_trabajo=# SET ROLE rol_soporte;
+SET
+copia_trabajo=> SELECT * FROM usuario LIMIT 1;
+ERROR:  permiso denegado a la tabla usuario
+copia_trabajo=> SELECT * FROM v_usuarios_seguros LIMIT 2;
+ id_usuario |  nombre   |  apellido
+------------+-----------+------------
+          2 | Usuario_2 | Apellido_2
+          4 | Usuario_4 | Apellido_4
+(2 filas)
+
+copia_trabajo=> BEGIN; UPDATE usuario SET email = email WHERE id_usuario = 1; ROLLBACK;
+BEGIN
+ERROR:  permiso denegado a la tabla usuario
+ROLLBACK
+copia_trabajo=> UPDATE usuario SET rol = 'admin' WHERE id_usuario = 1;
+ERROR:  permiso denegado a la tabla usuario
+copia_trabajo=> RESET ROLE;
+RESET
+
+Observación sobre el tercer comando: SET email = email LEE la columna email del
+lado derecho, y para leerla hace falta SELECT(email), que rol_soporte no tiene.
+El rechazo es correcto; la prueba estaba mal planteada (error del asistente al
+proponerla, ver docs/auditoria_roles_sql.md). Se repitió con un valor constante:
+
+copia_trabajo=# SET ROLE rol_soporte;
+SET
+copia_trabajo=> BEGIN;
+BEGIN
+copia_trabajo=*> UPDATE usuario SET email = 'prueba@example.invalid' WHERE id_usuario = 1;
+UPDATE 1
+copia_trabajo=*> ROLLBACK;
+ROLLBACK
+copia_trabajo=> UPDATE usuario SET email = 'x@example.invalid' WHERE nombre = 'Usuario_1';
+ERROR:  permiso denegado a la tabla usuario
+copia_trabajo=> RESET ROLE;
+RESET
+
+Resultado: rol_soporte puede corregir el email de un usuario localizado por
+id_usuario (SELECT(id_usuario) + UPDATE(email)), no puede leer la tabla usuario,
+no puede modificar rol, y no puede filtrar por columnas sin SELECT (nombre).
+Limitación funcional documentada: soporte puede corregir un email, pero no puede
+ver el email actual, porque v_usuarios_seguros no lo incluye.
+
+copia_trabajo=# SET ROLE rol_reportes;
+SET
+copia_trabajo=> SELECT * FROM v_pedidos_usuario LIMIT 1;
+ERROR:  permiso denegado a la vista v_pedidos_usuario
+copia_trabajo=> SELECT count(*) FROM vm_facturacion_categoria_mes;
+ count
+-------
+    13
+(1 fila)
+
+copia_trabajo=> RESET ROLE;
+RESET
+
+Resultado: rol_reportes no accede a la vista con datos personales
+(v_pedidos_usuario) y sí a la vista materializada agregada.
+
+===============================================================================
+3. admin_datos  (psql -U admin_datos -h localhost -d copia_trabajo)
+===============================================================================
+copia_trabajo=> ALTER ROLE app_web PASSWORD 'x';
+ERROR:  se ha denegado el permiso para alterar el rol
+DETALLE:  Para cambiar la password de otro rol, el usuario actual debe tener el atributo CREATEROLE y la opción ADMIN en el rol.
+copia_trabajo=> SELECT password_hash FROM usuario LIMIT 1;
+ERROR:  permiso denegado a la tabla usuario
+copia_trabajo=> SELECT fn_resetear_password(1, 'clave-de-prueba');
+ fn_resetear_password
+----------------------
+ f
+(1 fila)
+
+copia_trabajo=> SELECT fn_autenticar('usuario1@example.invalid', 'clave-de-prueba');
+ERROR:  permiso denegado a la función fn_autenticar
+copia_trabajo=> SELECT fn_resetear_password(2, 'clave-de-prueba');
+ fn_resetear_password
+----------------------
+ t
+(1 fila)
+
+Resultado:
+- CREATEROLE sin la opción ADMIN no permite cambiar la clave de otro rol.
+- admin_datos no puede leer password_hash.
+- fn_resetear_password(1, ...) devuelve f porque el usuario 1 está eliminado
+  (la función no actúa sobre bajas lógicas); con el usuario activo 2 devuelve t.
+- admin_datos no puede ejecutar fn_autenticar (separación de funciones).
+
+===============================================================================
+4. app_web - autenticación con fn_autenticar (usuario 2, clave sintética)
+===============================================================================
+copia_trabajo=> SELECT fn_autenticar('usuario2@example.invalid', 'clave-de-prueba');
+ fn_autenticar
+---------------
+ cliente
+(1 fila)
+
+copia_trabajo=> SELECT fn_autenticar('usuario2@example.invalid', 'incorrecta');
+ fn_autenticar
+---------------
+
+(1 fila)
+
+copia_trabajo=> SELECT fn_autenticar('usuario2@example.invalid', 'clave-de-prueba');
+ fn_autenticar
+---------------
+ cliente
+(1 fila)
+
+Resultado: clave correcta devuelve el rol de aplicación ('cliente'); clave
+incorrecta devuelve NULL sin indicar si falló el email o la clave; tras el
+fallo, un login correcto sigue funcionando y reinicia intentos_fallidos.
+Estas pruebas se hicieron ANTES de activar log_statement, para que las claves
+(sintéticas) no queden en el log del servidor.

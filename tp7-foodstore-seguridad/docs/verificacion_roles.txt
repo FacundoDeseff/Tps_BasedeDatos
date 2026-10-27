@@ -1,0 +1,177 @@
+Verificación de roles.sql (Parte A, punto 3)
+Base: copia_trabajo - PostgreSQL 17.11 - ejecutado como postgres
+Script: sql/verificacion_roles.sql (salida copiada de la sesión de psql).
+Nota: se corrigieron sólo los caracteres rotos por el código de página 850 de la
+consola de Windows en dos encabezados ("Membresías", "Replicación"); el resto
+de la salida está sin modificar.
+
+== 1. Roles y atributos (\du) ==
+                                 Lista de roles
+   Nombre de rol   |                         Atributos
+-------------------+------------------------------------------------------------
+ admin_datos       | Crear rol, Crear BD
+ app_web           |
+ postgres          | Superusuario, Crear rol, Crear BD, Replicación, Ignora RLS
+ rol_app_escritura | Sin herencia, No puede conectarse
+ rol_app_lectura   | Sin herencia, No puede conectarse
+ rol_reportes      | Sin herencia, No puede conectarse
+ rol_soporte       | Sin herencia, No puede conectarse
+
+
+== 2. Atributos exactos ==
+      rolname      | rolsuper | rolcreatedb | rolcreaterole | rolinherit | rolcanlogin
+-------------------+----------+-------------+---------------+------------+-------------
+ admin_datos       | f        | t           | t             | t          | t
+ app_web           | f        | f           | f             | t          | t
+ rol_app_escritura | f        | f           | f             | f          | f
+ rol_app_lectura   | f        | f           | f             | f          | f
+ rol_reportes      | f        | f           | f             | f          | f
+ rol_soporte       | f        | f           | f             | f          | f
+(6 filas)
+
+
+== 3. Membresías (app_web NO debe ser miembro de admin_datos) ==
+ miembro |    miembro_de
+---------+-------------------
+ app_web | rol_app_lectura
+ app_web | rol_app_escritura
+(2 filas)
+
+
+== 4. Privilegios por tabla (information_schema.role_table_grants) ==
+      grantee      |        table_name         | privilege_type
+-------------------+---------------------------+----------------
+ admin_datos       | categoria                 | DELETE
+ admin_datos       | categoria                 | INSERT
+ admin_datos       | categoria                 | REFERENCES
+ admin_datos       | categoria                 | SELECT
+ admin_datos       | categoria                 | TRIGGER
+ admin_datos       | categoria                 | TRUNCATE
+ admin_datos       | categoria                 | UPDATE
+ admin_datos       | detalle_pedido            | DELETE
+ admin_datos       | detalle_pedido            | INSERT
+ admin_datos       | detalle_pedido            | REFERENCES
+ admin_datos       | detalle_pedido            | SELECT
+ admin_datos       | detalle_pedido            | TRIGGER
+ admin_datos       | detalle_pedido            | TRUNCATE
+ admin_datos       | detalle_pedido            | UPDATE
+ admin_datos       | pedido                    | DELETE
+ admin_datos       | pedido                    | INSERT
+ admin_datos       | pedido                    | REFERENCES
+ admin_datos       | pedido                    | SELECT
+ admin_datos       | pedido                    | TRIGGER
+ admin_datos       | pedido                    | TRUNCATE
+ admin_datos       | pedido                    | UPDATE
+ admin_datos       | producto                  | DELETE
+ admin_datos       | producto                  | INSERT
+ admin_datos       | producto                  | REFERENCES
+ admin_datos       | producto                  | SELECT
+ admin_datos       | producto                  | TRIGGER
+ admin_datos       | producto                  | TRUNCATE
+ admin_datos       | producto                  | UPDATE
+ admin_datos       | usuario                   | DELETE
+ admin_datos       | v_detalle_pedido_producto | SELECT
+ admin_datos       | v_pedidos_usuario         | SELECT
+ admin_datos       | v_productos_vigentes      | SELECT
+ admin_datos       | v_usuarios_seguros        | SELECT
+ rol_app_escritura | detalle_pedido            | INSERT
+ rol_app_escritura | pedido                    | INSERT
+ rol_app_lectura   | categoria                 | SELECT
+ rol_app_lectura   | producto                  | SELECT
+ rol_app_lectura   | v_productos_vigentes      | SELECT
+ rol_reportes      | categoria                 | SELECT
+ rol_reportes      | producto                  | SELECT
+ rol_reportes      | v_detalle_pedido_producto | SELECT
+ rol_reportes      | v_productos_vigentes      | SELECT
+ rol_soporte       | v_detalle_pedido_producto | SELECT
+ rol_soporte       | v_pedidos_usuario         | SELECT
+ rol_soporte       | v_usuarios_seguros        | SELECT
+(45 filas)
+
+
+== 5. Privilegios por columna (information_schema.column_privileges) ==
+      grantee      |   table_name   |    column_name    | privilege_type
+-------------------+----------------+-------------------+----------------
+ admin_datos       | usuario        | apellido          | INSERT
+ admin_datos       | usuario        | apellido          | SELECT
+ admin_datos       | usuario        | apellido          | UPDATE
+ admin_datos       | usuario        | eliminado         | INSERT
+ admin_datos       | usuario        | eliminado         | SELECT
+ admin_datos       | usuario        | eliminado         | UPDATE
+ admin_datos       | usuario        | email             | INSERT
+ admin_datos       | usuario        | email             | SELECT
+ admin_datos       | usuario        | email             | UPDATE
+ admin_datos       | usuario        | fecha_alta        | INSERT
+ admin_datos       | usuario        | fecha_alta        | SELECT
+ admin_datos       | usuario        | fecha_alta        | UPDATE
+ admin_datos       | usuario        | id_usuario        | SELECT
+ admin_datos       | usuario        | intentos_fallidos | INSERT
+ admin_datos       | usuario        | intentos_fallidos | SELECT
+ admin_datos       | usuario        | intentos_fallidos | UPDATE
+ admin_datos       | usuario        | nombre            | INSERT
+ admin_datos       | usuario        | nombre            | SELECT
+ admin_datos       | usuario        | nombre            | UPDATE
+ admin_datos       | usuario        | rol               | INSERT
+ admin_datos       | usuario        | rol               | SELECT
+ admin_datos       | usuario        | rol               | UPDATE
+ rol_app_escritura | detalle_pedido | id_detalle        | SELECT
+ rol_app_escritura | pedido         | id_pedido         | SELECT
+ rol_soporte       | usuario        | email             | UPDATE
+ rol_soporte       | usuario        | id_usuario        | SELECT
+ rol_soporte       | usuario        | intentos_fallidos | UPDATE
+(27 filas)
+
+
+== 6. EXECUTE en funciones (no debe aparecer PUBLIC) ==
+   grantee   |     routine_name     | privilege_type
+-------------+----------------------+----------------
+ app_web     | fn_autenticar        | EXECUTE
+ postgres    | fn_autenticar        | EXECUTE
+ admin_datos | fn_resetear_password | EXECUTE
+ postgres    | fn_resetear_password | EXECUTE
+(4 filas)
+
+
+== 7. Secuencias y vistas materializadas (ACL cruda) ==
+            relname            | relkind |                                     relacl
+-------------------------------+---------+--------------------------------------------------------------------------------
+ categoria_id_categoria_seq    | S       | {postgres=rwU/postgres,admin_datos=rwU/postgres}
+ detalle_pedido_id_detalle_seq | S       | {postgres=rwU/postgres,rol_app_escritura=rU/postgres,admin_datos=rwU/postgres}
+ pedido_id_pedido_seq          | S       | {postgres=rwU/postgres,rol_app_escritura=rU/postgres,admin_datos=rwU/postgres}
+ producto_id_producto_seq      | S       | {postgres=rwU/postgres,admin_datos=rwU/postgres}
+ usuario_id_usuario_seq        | S       | {postgres=rwU/postgres,admin_datos=rwU/postgres}
+ vm_facturacion_categoria_mes  | m       | {postgres=arwdDxtm/postgres,rol_reportes=r/postgres,admin_datos=rm/postgres}
+(6 filas)
+
+
+== 8. Defaults (ALTER DEFAULT PRIVILEGES) ==
+ propietario | esquema | tipo |            defaclacl
+-------------+---------+------+---------------------------------
+ postgres    | public  | S    | {rol_app_escritura=rU/postgres}
+ postgres    |         | f    | {postgres=X/postgres}
+(2 filas)
+
+
+-------------------------------------------------------------------------------
+Lectura de la salida contra la matriz de docs/kiro_roles_spec/design.md §4
+-------------------------------------------------------------------------------
+- Grupos: los cuatro sin LOGIN, SUPERUSER, CREATEDB ni CREATEROLE (sección 2).
+- app_web: sin SUPERUSER/CREATEDB/CREATEROLE; miembro sólo de rol_app_lectura y
+  rol_app_escritura; ninguna fila app_web -> admin_datos (sección 3).
+- Ningún rol salvo admin_datos tiene DELETE, TRUNCATE, REFERENCES ni TRIGGER
+  (sección 4).
+- La vista materializada no figura en la sección 4 porque
+  information_schema.role_table_grants no incluye vistas materializadas; se
+  verifica en la sección 7 (rol_reportes=r, admin_datos=rm, es decir SELECT y
+  MAINTAIN para el REFRESH).
+- usuario: admin_datos sólo tiene DELETE a nivel de tabla; SELECT, INSERT y
+  UPDATE son por columna (sección 5) y password_hash no aparece para ningún rol.
+- rol_soporte: SELECT(id_usuario) y UPDATE(email, intentos_fallidos); sin acceso
+  a la tabla usuario completa.
+- rol_app_escritura: INSERT en pedido y detalle_pedido, SELECT sólo en las dos
+  PK (necesario para INSERT ... RETURNING) y USAGE/SELECT sólo en las dos
+  secuencias de esas tablas.
+- EXECUTE: fn_autenticar -> app_web; fn_resetear_password -> admin_datos; no hay
+  PUBLIC (postgres figura por ser dueño de las funciones).
+- Defaults: sólo secuencias para rol_app_escritura y EXECUTE revocado a PUBLIC
+  para funciones futuras; ningún default de privilegios sobre tablas.
