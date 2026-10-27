@@ -1,38 +1,186 @@
-# Informe del simulacro de incidente
+# Informe del simulacro de incidente (Parte C)
 
-## Secuencia y resultado esperado
+Base `copia_trabajo`, PostgreSQL 17.11, Windows. Ejecución del **2026-10-27
+18:31:41 UTC-3**, conectado como `app_web`.
+Script: `sql/simulacro_incidente.sql` (preparación: `sql/simulacro_preparacion.sql`).
+Evidencia: `docs/log_simulacro_anonimizado.txt` y `docs/pruebas_simulacro.txt`.
 
-`sql/simulacro_incidente.sql` registra tres intentos fallidos a
-`fn_autenticar`, documenta el login exitoso con una cuenta sintética, ejecuta
-una lectura masiva de `usuario` y finalmente prueba `GRANT admin_datos TO
-app_web`. La última sentencia debe producir `ERROR: permission denied to grant
-role "admin_datos"` cuando se conecta como `app_web`.
+## 1. Secuencia ejecutada y resultado real
 
-La parte de autenticación se separa del `GRANT`: una función que devuelve
-`false` prueba credenciales inválidas, pero no equivale a un fallo del
-protocolo de conexión de PostgreSQL. Por eso el log debe incluir también los
-intentos `psql` fallidos, sin registrar contraseñas.
+Todo el simulacro se ejecutó contra la base de desarrollo propia. El escalamiento
+se intentó con la identidad de bajo privilegio, que es lo que le da sentido al
+ejercicio: si se corre como `postgres`, el `GRANT` final tendría éxito y además
+dejaría a `app_web` con membresía en `admin_datos`.
 
-## Reconstrucción crítica
+| # | Hora (UTC-3) | Paso | Sentencia | Resultado real |
+|---|---|---|---|---|
+| 0 | 18:31:41.163 | conexión | `psql -U app_web -d copia_trabajo` | autenticado con `scram-sha-256`, desde `::1` |
+| 1 | 18:31:41.180 | inicio | `SELECT 'INICIO_C'` | marca de corte para el log |
+| 2 | 18:31:41.180 | intento fallido 1 | `fn_autenticar('cuenta_a@sintetico.example','clave_incorrecta_01')` | `NULL` |
+| 3 | 18:31:41.200 | intento fallido 2 | idem, `clave_incorrecta_02` | `NULL` |
+| 4 | 18:31:41.211 | intento fallido 3 | idem, `clave_incorrecta_03` | `NULL` |
+| 5 | 18:31:41.222 | intento fallido 4 | idem, `clave_incorrecta_04` | `NULL` |
+| 6 | 18:31:41.233 | **inicio de sesión exitoso** | `fn_autenticar(..., clave correcta)` | **`cliente`** |
+| 7 | 18:31:41.245 | lectura masiva | `SELECT * FROM usuario` | `ERROR: permiso denegado a la tabla usuario` |
+| 8 | 18:31:41.245 | lectura masiva (conteo) | `SELECT count(*) FROM usuario` | `ERROR: permiso denegado a la tabla usuario` |
+| 9 | 18:31:41.246 | escalamiento 1 | `GRANT admin_datos TO app_web` | `ERROR: se ha denegado el permiso para otorgar el rol «admin_datos»` |
+| 10 | 18:31:41.246 | escalamiento 2 | `GRANT admin_datos TO rol_soporte` | mismo error |
+| 11 | 18:31:41.246 | fin | `SELECT 'FIN_C'` y desconexión | sesión de 0,092 s |
 
-El log anonimizado permite afirmar la secuencia temporal, la identidad de base,
-la consulta masiva y el error de autorización. No permite afirmar por sí solo
-la intención del actor, la identidad humana detrás de la cuenta, la causa raíz
-ni una fecha distinta de la registrada. Cualquier respuesta de IA que complete
-esos datos debe marcarse como hipótesis no sustentada.
+Cuatro intentos fallidos y un éxito, en ese orden. Son cuatro y no cinco por una
+razón de diseño: `fn_autenticar` bloquea la cuenta al llegar a cinco intentos
+(`c_umbral = 5`), de modo que un quinto fallo previo haría que el intento
+correcto devolviera `'cuenta_bloqueada'` y el escenario quedaría sin login
+exitoso. Con cuatro, el contador queda en 4, el acierto entra y además lo
+reinicia a 0, así que el script se puede repetir.
 
-## Contención decidida por el equipo
+**Punto clave para la lectura crítica (C.5):** el log registra la *sentencia*,
+no su resultado. La única prueba de que el paso 6 tuvo éxito es la salida de
+`psql` guardada en `docs/pruebas_simulacro.txt` (`resultado_login = cliente`).
+El log, por sí solo, muestra cinco llamadas iguales y no permite saber cuál
+funcionó.
 
-En un caso real, el equipo preservaría primero los logs, revocaría o
-deshabilitaría la credencial comprometida, forzaría el cambio de credenciales
-relacionadas y limitaría el origen de red. Luego revisaría membresías de roles,
-consultas sobre `usuario` y accesos posteriores. Estas acciones son una
-decisión humana basada en evidencia; no se ejecutan automáticamente por una
-recomendación de IA ni se aplican al entorno del TP.
+## 2. Verificación del escalamiento (C.2)
 
-## Evidencia a adjuntar
+El escalamiento **falló**, como debía. El mensaje exacto fue:
 
-- fragmento de `log_simulacro_anonimizado.txt`;
-- salida de los tres fallos, login exitoso, `SELECT` masivo y `GRANT` fallido;
-- respuesta de OpenCode;
-- contraste entre lo que el log demuestra y lo que la IA supuso.
+```text
+ERROR:  se ha denegado el permiso para otorgar el rol «admin_datos»
+DETALLE:  Sólo los roles con la opción ADMIN en el rol «admin_datos» pueden otorgar este rol.
+```
+
+Se probaron dos variantes —darse el rol a sí mismo (`TO app_web`) y dárselo a
+otro rol de bajo privilegio (`TO rol_soporte`)— y las dos fueron rechazadas.
+
+Comprobación de que no quedó rastro, ejecutada como `postgres`:
+
+```sql
+SELECT m.rolname AS miembro_de, r.rolname AS miembro
+FROM pg_auth_members AS am
+JOIN pg_roles AS r ON r.oid = am.member
+JOIN pg_roles AS m ON m.oid = am.roleid
+WHERE m.rolname = 'admin_datos';
+```
+
+```text
+ miembro_de | miembro
+------------+---------
+(0 filas)
+```
+
+Es decir: el esquema de la Parte A resistió. No hubo hallazgo que corregir.
+
+## 3. Notas de ejecución
+
+1. **Primer intento descartado (18:31:12, pid 10320).** El paso 6 devolvió `NULL`
+   en lugar de `cliente`. Se verificó contra el hash almacenado con
+   `crypt(candidata, password_hash) = password_hash` y se comprobó que la clave
+   usada tenía un **espacio al final**, introducido por la forma de pasar el
+   valor en la línea de comandos. No era un defecto del esquema ni de la
+   función. Se repitió con la clave exacta y la corrida válida es la de las
+   18:31:41 (pid 9848). El intento descartado también quedó en el log del
+   servidor; el fragmento anonimizado incluye sólo la sesión válida y el informe
+   lo aclara.
+2. **La cuenta de prueba se prepara aparte.** `sql/simulacro_preparacion.sql`
+   crea (o desbloquea) `cuenta_a@sintetico.example` y fija su clave por consola,
+   para que el escenario parta siempre del mismo estado (`intentos_fallidos = 0`).
+   La clave no se escribe en ningún archivo del repositorio.
+3. **El log incluye las credenciales en claro.** Con `log_statement = 'all'`, el
+   texto de cada sentencia queda escrito con sus literales: en la misma sesión
+   de diagnóstico el log registró la clave de prueba en claro. Es evidencia
+   directa de por qué el archivo de log es un activo sensible (Parte B, punto 4)
+   y de por qué se anonimiza antes de compartirlo (C.3).
+
+## 4. Criterio de anonimización del fragmento (C.3)
+
+Se extrajo del log del servidor únicamente la sesión `app_web` (pid 9848),
+delimitada por las marcas `INICIO_C` / `FIN_C` y las líneas de conexión y
+desconexión.
+
+| Dato | Acción | Motivo |
+|---|---|---|
+| clave de la cuenta de prueba | reemplazada por `clave_sintetica_05` | es una credencial; no debe salir del entorno |
+| correo de la cuenta | se conserva (ya es sintético: `@sintetico.example`) | dominio reservado, no corresponde a una persona |
+| rol, base, origen (`::1`), hora, pid | se conservan | son imprescindibles para reconstruir la secuencia |
+| texto de las sentencias | se conserva | es la evidencia del incidente |
+| sesiones de `postgres` del mismo archivo | excluidas | contenían literales de credenciales en claro |
+
+El resultado es `docs/log_simulacro_anonimizado.txt`, sin datos personales
+reales y sin claves utilizables.
+
+## 5. Reconstrucción con IA (C.4)
+
+**Pendiente de ejecución.** El prompt es exactamente el siguiente, seguido del
+contenido completo de `docs/log_simulacro_anonimizado.txt`, sin agregar contexto:
+
+```text
+Este es un fragmento de log de un servidor PostgreSQL. Reconstruí qué ocurrió
+y proponé una hipótesis de contención.
+```
+
+La respuesta completa, sin editar, debe guardarse en
+`docs/respuesta_ia_simulacro.md` y no debe ejecutarse nada de lo que sugiera.
+
+## 6. Contraste entre la reconstrucción y lo ejecutado (C.5)
+
+Para evaluar la respuesta de la IA se parte de separar lo que el log **prueba**
+de lo que **no** prueba.
+
+**Lo que el fragmento sí demuestra:**
+
+- la identidad usada fue `app_web`, sobre la base `copia_trabajo`, desde `::1`, a las 18:31:41;
+- hubo cinco llamadas a `fn_autenticar` con el mismo correo y claves distintas;
+- las dos lecturas de `usuario` fueron denegadas por permisos;
+- los dos `GRANT admin_datos` fueron denegados;
+- la sesión completa duró 0,092 s y terminó con una desconexión normal.
+
+**Lo que el fragmento no demuestra:**
+
+- cuál de las cinco llamadas tuvo éxito (el log no registra resultados);
+- si hubo filtración de datos: las lecturas masivas **fallaron**, no devolvieron filas;
+- la intención ni la identidad humana detrás de la cuenta;
+- cómo se obtuvo la credencial;
+- ninguna fecha distinta de la registrada.
+
+Cualquier afirmación de la IA que complete esos puntos es una hipótesis no
+sustentada y debe marcarse como tal.
+
+| Qué acertó | Qué omitió | Qué afirmó sin sustento |
+|---|---|---|
+| *(a completar con la respuesta de C.4)* | *(idem)* | *(idem)* |
+
+## 7. Decisión de contención del equipo (C.6)
+
+> Borrador para revisión del equipo antes de entregar. La decisión es del equipo
+> y se toma a partir de la evidencia; no se ejecutó ninguna acción automática a
+> partir de una sugerencia de IA.
+
+En un caso real, el orden de intervención sería:
+
+1. **Preservar la evidencia** antes de tocar nada: asegurar el log, sacarlo del
+   servidor y guardarlo con permisos restringidos (el log es en sí mismo un
+   activo sensible).
+2. **Cortar el acceso con la credencial involucrada:** rotar la clave de
+   `app_web` y revisar si la cuenta se usó desde otros orígenes. La cuenta
+   atacada era la de la aplicación, así que la rotación impacta al servicio y
+   debe coordinarse.
+3. **Descartar el escalamiento:** verificar que ningún rol tenga membresía en
+   `admin_datos` (la consulta de la sección 2, que hoy devuelve 0 filas).
+4. **Revisar el rastro de autenticación:** `intentos_fallidos` y las lecturas de
+   `usuario` en el período, para medir alcance.
+5. **Limitar el origen** a nivel de red (`pg_hba.conf`) si el acceso no debería
+   venir de esa dirección.
+
+Lo que **no** haría el equipo es revertir roles o borrar datos a partir de la
+hipótesis de la IA: primero se confirma con evidencia propia, después se actúa.
+En este simulacro no se aplicó ninguna de estas medidas porque el entorno es de
+desarrollo y la evidencia ya quedó preservada en el repositorio.
+
+## 8. Evidencia adjunta
+
+- `sql/simulacro_incidente.sql` — secuencia completa, ejecutable como `app_web`.
+- `sql/simulacro_preparacion.sql` — preparación de la cuenta sintética.
+- `docs/log_simulacro_anonimizado.txt` — fragmento del log, anonimizado.
+- `docs/pruebas_simulacro.txt` — salida de `psql`: prueba del login exitoso y de
+  las cuatro denegaciones.
+- Respuesta de la IA (C.4) y contraste completo (C.5) — pendientes de completar.
