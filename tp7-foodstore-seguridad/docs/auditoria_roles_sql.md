@@ -2,11 +2,12 @@
 
 ## Quién auditó y con qué
 
-La consigna pide que la auditoría la haga OpenCode. Esta auditoría la realizó
-**Claude Code**, que fue el asistente usado en la sesión de implementación;
-OpenCode no intervino. Se deja constancia para que la bitácora refleje lo que
-ocurrió. Si el equipo repite la auditoría con OpenCode, su prompt y su respuesta
-deben agregarse a `BITACORA.md` como un registro aparte.
+La consigna pide que la auditoría la haga OpenCode. La **primera** auditoría la
+realizó **Claude Code**, que fue el asistente usado en la sesión de
+implementación: se deja constancia para que la bitácora refleje lo que ocurrió.
+Después la auditoría se **repitió con OpenCode** en una sesión nueva y sin
+contexto previo; su prompt, su respuesta y la validación del equipo están en la
+sección 4 y en `BITACORA.md`. Las dos auditorías se conservan.
 
 Insumos de la auditoría: `sql/roles.sql`, `sql/00_reconstruccion_clase2.sql`,
 `docs/kiro_roles_spec/`, la salida de `sql/verificacion_roles.sql` y las pruebas
@@ -90,3 +91,50 @@ Lectura:
    ```
 4. **`fn_autenticar` no es ejecutable por `admin_datos`**, como indica la
    separación de funciones de RF-07.
+
+## 4. Re-auditoría con OpenCode (Parte A, punto 4)
+
+Sesión nueva, sin contexto previo: se le pasó únicamente el contenido de
+`sql/roles.sql`.
+
+**Prompt enviado (textual):**
+
+```text
+Auditá este script de roles y permisos de PostgreSQL bajo el principio de
+mínimo privilegio. Marcá los permisos que son más amplios de lo necesario,
+los riesgos de seguridad que veas y qué cambiarías concretamente.
+```
+
+**Qué acertó.** Coincidió con hallazgos ya registrados: `TRUNCATE` + `TRIGGER`
+equivalen a `ALL` (H2), `admin_datos` con `UPDATE` sobre todas las secuencias (H5)
+y la ausencia de `CONNECTION LIMIT` / `VALID UNTIL` (H7). Además encontró un punto
+que las auditorías anteriores no habían registrado:
+
+| # | Severidad | Hallazgo | Recomendación | Estado |
+|---|---|---|---|---|
+| H10 | Baja | `roles.sql` revoca `CREATE` a `PUBLIC` sobre el esquema, pero `PUBLIC` conserva `USAGE`, que es el valor por defecto del motor. Cualquier rol no previsto en la matriz puede navegar el esquema y resolver nombres de objetos | `REVOKE USAGE ON SCHEMA public FROM PUBLIC`, después de otorgar `USAGE` a los seis roles | Pendiente de decisión |
+
+**Qué afirmó sin sustento.** Tres puntos, y son justamente los que sostienen su
+veredicto:
+
+1. «`EXECUTE` de funciones sigue concedido a `PUBLIC`», marcado como **crítico**.
+   Es falso: `sql/00_reconstruccion_clase2.sql:134` y `:163` ejecutan
+   `REVOKE ALL ON FUNCTION ... FROM PUBLIC` al crear las funciones, y
+   `docs/verificacion_roles.txt:125-131` muestra el estado real, sin `PUBLIC`. La
+   IA leyó sólo `roles.sql` y generalizó sobre lo que no veía.
+2. «`rol_soporte` puede reescribir el email y después resetear la clave». La
+   primera mitad es cierta —es el permiso por columna que exige la consigna—; la
+   segunda no: `rol_soporte` no tiene `EXECUTE` sobre `fn_resetear_password`.
+3. «`v_usuarios_seguros` podría exponer datos personales a `rol_reportes`». Esa
+   vista no está otorgada a `rol_reportes` (ver `sql/roles.sql:135-137`).
+
+**Qué se descartó por diseño.** `CREATEDB`, `CREATEROLE` y `CREATE` sobre el
+esquema para `admin_datos`, y el `UPDATE (email)` de `rol_soporte`: son decisiones
+de la matriz de la spec, justificadas en `design.md`, y la sección 3 de este
+documento prueba que `CREATEROLE` no alcanza para modificar roles ajenos en
+PostgreSQL 17.
+
+**Veredicto del equipo.** La implementación **sí** coincide con la matriz de la
+spec (ver `docs/verificacion_roles.txt`); el veredicto «no cumple» de la IA se
+descarta. Se aceptan H2, H5, H7 y H10 como pendientes de decisión del equipo, y
+H1, H3, H6 y H8 quedan como estaban.
