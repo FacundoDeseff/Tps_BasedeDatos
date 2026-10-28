@@ -35,17 +35,17 @@ que no puede registrar pedidos.
 
 La implementación coincide con la matriz de la spec (ver
 `docs/verificacion_roles.txt`). Estos son los puntos que quedan, ordenados por
-relevancia. El estado "pendiente" significa que **la decisión es del equipo**.
+relevancia. La decisión del equipo sobre cada uno está en la §5.
 
 | # | Severidad | Hallazgo | Recomendación | Estado |
 |---|---|---|---|---|
-| H1 | Media | `admin_datos` tiene `CREATE` sobre el esquema `public` y las funciones `SECURITY DEFINER` resuelven `crypt` y `gen_salt` (de `pgcrypto`, instalada en `public`) a través de `search_path = public, pg_temp`. Es el patrón clásico de secuestro de funciones. Hoy las llamadas coinciden exactamente con la firma de `pgcrypto`, por lo que la explotación es poco probable, pero la defensa depende de un detalle | Calificar `public.crypt` y `public.gen_salt` dentro de las funciones, o instalar `pgcrypto` en un esquema propio | Pendiente de decisión |
-| H2 | Media | `admin_datos` tiene `TRUNCATE`, `TRIGGER` y `REFERENCES` sobre cuatro tablas. La spec los enumera, pero ninguna tarea descrita los necesita; `TRIGGER` permite además ejecutar código ajeno cuando otros roles escriben en esas tablas | Quitar `TRUNCATE`, `TRIGGER` y `REFERENCES` y otorgarlos sólo cuando una tarea de mantenimiento lo requiera | Pendiente de decisión |
-| H3 | Baja | `PUBLIC` conserva `CONNECT` y `TEMP` sobre la base. Cualquier rol, incluido `app_web`, puede crear tablas temporales. La spec no lo trata | `REVOKE TEMP ON DATABASE copia_trabajo FROM PUBLIC` y `GRANT CONNECT` explícito a `app_web` y `admin_datos` | Pendiente de decisión |
+| H1 | Media | `admin_datos` tiene `CREATE` sobre el esquema `public` y las funciones `SECURITY DEFINER` resuelven `crypt` y `gen_salt` (de `pgcrypto`, instalada en `public`) a través de `search_path = public, pg_temp`. Es el patrón clásico de secuestro de funciones. Hoy las llamadas coinciden exactamente con la firma de `pgcrypto`, por lo que la explotación es poco probable, pero la defensa depende de un detalle | Calificar `public.crypt` y `public.gen_salt` dentro de las funciones, o instalar `pgcrypto` en un esquema propio | Aceptado, con la mitigación indicada (§5) |
+| H2 | Media | `admin_datos` tiene `TRUNCATE`, `TRIGGER` y `REFERENCES` sobre cuatro tablas. La spec los enumera, pero ninguna tarea descrita los necesita; `TRIGGER` permite además ejecutar código ajeno cuando otros roles escriben en esas tablas | Quitar `TRUNCATE`, `TRIGGER` y `REFERENCES` y otorgarlos sólo cuando una tarea de mantenimiento lo requiera | Aceptado (§5) |
+| H3 | Baja | `PUBLIC` conserva `CONNECT` y `TEMP` sobre la base. Cualquier rol, incluido `app_web`, puede crear tablas temporales. La spec no lo trata | `REVOKE TEMP ON DATABASE copia_trabajo FROM PUBLIC` y `GRANT CONNECT` explícito a `app_web` y `admin_datos` | Aceptado (§5) |
 | H4 | Baja | El `ALTER DEFAULT PRIVILEGES ... REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC` es global (la sintaxis no admite `IN SCHEMA` para quitarle un default a `PUBLIC`). Las funciones que `postgres` cree en el futuro, incluidas las de extensiones, no serán ejecutables por todos | Documentarlo (hecho en el comentario del script) y otorgar `EXECUTE` explícito cuando corresponda | Aceptado y documentado |
-| H5 | Baja | `admin_datos` tiene `UPDATE` sobre todas las secuencias, lo que permite `setval` y podría provocar choques de claves primarias | Limitar a `USAGE, SELECT` salvo mantenimiento | Pendiente de decisión |
+| H5 | Baja | `admin_datos` tiene `UPDATE` sobre todas las secuencias, lo que permite `setval` y podría provocar choques de claves primarias | Limitar a `USAGE, SELECT` salvo mantenimiento | Aceptado (§5) |
 | H6 | Baja | `SELECT(id_pedido)` permite a `app_web` enumerar los ids de todos los pedidos | Riesgo residual aceptado: es el mínimo para que `RETURNING` funcione | Aceptado |
-| H7 | Baja | No hay `VALID UNTIL` ni `CONNECTION LIMIT` en los roles de login | Fijar un límite de conexiones para `app_web` | Pendiente de decisión |
+| H7 | Baja | No hay `VALID UNTIL` ni `CONNECTION LIMIT` en los roles de login | Fijar un límite de conexiones para `app_web` | Aceptado (§5) |
 | H8 | Informativa | Soporte puede corregir un email pero no verlo (la vista segura no lo incluye) | Es coherente con el mínimo privilegio; si el trabajo real lo exige, crear una vista de soporte con `email` | Documentado |
 | H9 | Informativa | `roles.sql` no controla desde dónde se conectan los roles: eso lo define `pg_hba.conf` | Revisar `pg_hba.conf` (fuera del alcance del script) | Fuera de alcance |
 
@@ -112,7 +112,7 @@ que las auditorías anteriores no habían registrado:
 
 | # | Severidad | Hallazgo | Recomendación | Estado |
 |---|---|---|---|---|
-| H10 | Baja | `roles.sql` revoca `CREATE` a `PUBLIC` sobre el esquema, pero `PUBLIC` conserva `USAGE`, que es el valor por defecto del motor. Cualquier rol no previsto en la matriz puede navegar el esquema y resolver nombres de objetos | `REVOKE USAGE ON SCHEMA public FROM PUBLIC`, después de otorgar `USAGE` a los seis roles | Pendiente de decisión |
+| H10 | Baja | `roles.sql` revoca `CREATE` a `PUBLIC` sobre el esquema, pero `PUBLIC` conserva `USAGE`, que es el valor por defecto del motor. Cualquier rol no previsto en la matriz puede navegar el esquema y resolver nombres de objetos | `REVOKE USAGE ON SCHEMA public FROM PUBLIC`, después de otorgar `USAGE` a los seis roles | Aceptado (§5) |
 
 **Qué afirmó sin sustento.** Tres puntos, y son justamente los que sostienen su
 veredicto:
@@ -136,5 +136,30 @@ PostgreSQL 17.
 
 **Veredicto del equipo.** La implementación **sí** coincide con la matriz de la
 spec (ver `docs/verificacion_roles.txt`); el veredicto «no cumple» de la IA se
-descarta. Se aceptan H2, H5, H7 y H10 como pendientes de decisión del equipo, y
-H1, H3, H6 y H8 quedan como estaban.
+descarta. Las decisiones sobre los diez hallazgos están en la §5.
+
+## 5. Decisión del equipo sobre los hallazgos
+
+Se revisaron los diez hallazgos y se decidió **no modificar `roles.sql`**: el
+script y su verificación (`docs/verificacion_roles.txt`,
+`docs/pruebas_funcionales_roles.txt`) están cerrados, y cualquier cambio obliga a
+regenerar toda la evidencia ejecutada. El objetivo de este TP es demostrar mínimo
+privilegio con evidencia, no endurecer un servidor en producción; por eso las
+correcciones quedan documentadas y priorizadas para un despliegue real.
+
+| # | Decisión | Motivo |
+|---|---|---|
+| H1 | Aceptar, con la mitigación indicada | La explotación exige `CREATE` en `public` (sólo lo tiene `admin_datos`) y una coincidencia exacta de firma con `pgcrypto`; en un entorno real se califican `public.crypt` y `public.gen_salt`. |
+| H2 | Aceptar | `admin_datos` es el rol de mantenimiento y la matriz de la spec enumera esos privilegios; ninguna tarea del TP los usa, pero quitarlos no cambia lo que se evalúa. |
+| H3 | Aceptar | Revocar `TEMP` y `CONNECT` a `PUBLIC` afecta a todo el clúster y su efecto depende de `pg_hba.conf`; es una decisión de despliegue. |
+| H4 | Aceptado y documentado | El `REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC` es global por una limitación de sintaxis, y así está comentado en el script. |
+| H5 | Aceptar | `admin_datos` usa las secuencias para mantenimiento; el riesgo de `setval` existe pero no hay tareas automáticas que lo disparen. |
+| H6 | Aceptado | Es el mínimo privilegio que hace funcionar `INSERT ... RETURNING`. |
+| H7 | Aceptar | El límite de conexiones y `VALID UNTIL` son parámetros operativos que se fijan al desplegar, no en el script de permisos. |
+| H8 | Documentado | Es coherente con mínimo privilegio; si soporte necesita ver el email, corresponde una vista específica. |
+| H9 | Fuera de alcance | El origen de las conexiones se define en `pg_hba.conf`, no en `roles.sql`. |
+| H10 | Aceptar | El `USAGE` de `PUBLIC` sobre el esquema es el default del motor; revocarlo obliga a re-otorgar a los seis roles y a regenerar la evidencia. |
+
+Orden de aplicación si se llevara a un entorno real: H1 y H10 primero (menor
+esfuerzo y mayor reducción de superficie), después H2 y H5 (privilegios que
+ninguna tarea usa) y por último H3 y H7 (requieren coordinación con la operación).
