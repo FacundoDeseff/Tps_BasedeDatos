@@ -1,0 +1,160 @@
+============================================================
+EVIDENCIA I4 - Simulacro de restauracion y RTO/RPO
+Integrante: Facu Ramirez (Parte 4)
+Fecha de ejecucion: 2026-10-28 20:38:30 a 20:38:48 (hora local)
+Maquina: FACU (usuario facun)
+Sistema: Windows, PowerShell 5.1.26100.9711
+Version de psql: psql (PostgreSQL) 17.11
+Puerto usado: localhost:5432
+Base destino: foodstore_restore_test (descartable)
+Base origen: foodstore (no se toca en ningun paso)
+Respaldo usado: foodstore_20261028_2008.dump
+  ruta: C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_2008.dump
+  bytes: 9.378.143 (8,94 MB)
+  creado: 2026-10-28 20:08:28 | modificado: 2026-10-28 20:08:37
+  SHA-256: DA38B10B7C0F87D3EF3D018809543E80406B08A20EA702E3933B96C110BE096D
+Script: scripts/restore_test.ps1
+Validaciones: sql/validaciones_restore.sql y sql/validaciones_restore_check.sql
+============================================================
+
+============================================================
+A. SIMULACRO - salida cruda (comando y log completo)
+============================================================
+Comando ejecutado:
+  .\scripts\restore_test.ps1 -Port 5432
+
+[2026-10-28 20:38:30] INFO  INICIO simulacro | destino=foodstore_restore_test | puerto=5432 | dump=C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_2008.dump | bytes=9378143 | sha256=DA38B10B7C0F87D3EF3D018809543E80406B08A20EA702E3933B96C110BE096D
+[2026-10-28 20:38:31] INFO  Pre-flight OK | objetos=33 | tablas=categoria,producto,usuario,pedido,detalle_pedido
+[2026-10-28 20:38:31] INFO  dropdb> NOTICE:  no existe la base de datos «foodstore_restore_test», omitiendo
+[2026-10-28 20:38:31] INFO  T0=2026-10-28 20:38:31.651 | creando foodstore_restore_test
+[2026-10-28 20:38:33] INFO  Ejecutando: pg_restore -h localhost -p 5432 -U postgres -d foodstore_restore_test --no-owner --no-privileges --exit-on-error C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_2008.dump
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> ==============================================================
+[2026-10-28 20:38:45] INFO  validacion> VALIDACIONES DE RESTAURACION - foodstore_restore_test
+[2026-10-28 20:38:45] INFO  validacion> ==============================================================
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> --- 1. CONTEOS POR TABLA (observado vs. esperado pre-respaldo) ---
+[2026-10-28 20:38:45] INFO  validacion>      tabla      | observado | esperado | estado 
+[2026-10-28 20:38:45] INFO  validacion> ----------------+-----------+----------+--------
+[2026-10-28 20:38:45] INFO  validacion>  categoria      |        11 |       11 | OK
+[2026-10-28 20:38:45] INFO  validacion>  usuario        |     20000 |    20000 | OK
+[2026-10-28 20:38:45] INFO  validacion>  producto       |     50000 |    50000 | OK
+[2026-10-28 20:38:45] INFO  validacion>  pedido         |    200000 |   200000 | OK
+[2026-10-28 20:38:45] INFO  validacion>  detalle_pedido |    400000 |   400000 | OK
+[2026-10-28 20:38:45] INFO  validacion> (5 rows)
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> --- 2. PRODUCTOS INVALIDOS (precio_lista <= 0 o stock < 0) ---
+[2026-10-28 20:38:45] INFO  validacion>        control       | esperado | observado | estado 
+[2026-10-28 20:38:45] INFO  validacion> ---------------------+----------+-----------+--------
+[2026-10-28 20:38:45] INFO  validacion>  productos_invalidos |        0 |         0 | OK
+[2026-10-28 20:38:45] INFO  validacion> (1 row)
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> --- 3. DETALLES INVALIDOS (cantidad <= 0 o subtotal < 0) ---
+[2026-10-28 20:38:45] INFO  validacion>       control       | esperado | observado | estado 
+[2026-10-28 20:38:45] INFO  validacion> --------------------+----------+-----------+--------
+[2026-10-28 20:38:45] INFO  validacion>  detalles_invalidos |        0 |         0 | OK
+[2026-10-28 20:38:45] INFO  validacion> (1 row)
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> --- 4. CLAVES FORANEAS HUERFANAS ---
+[2026-10-28 20:38:45] INFO  validacion>    control    | esperado | observado | estado 
+[2026-10-28 20:38:45] INFO  validacion> --------------+----------+-----------+--------
+[2026-10-28 20:38:45] INFO  validacion>  fk_huerfanas |        0 |         0 | OK
+[2026-10-28 20:38:45] INFO  validacion> (1 row)
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> --- 5. CONSISTENCIA DE TOTALES (pedido.total = SUM(detalle_pedido.subtotal)) ---
+[2026-10-28 20:38:45] INFO  validacion>        control       | esperado | observado | estado 
+[2026-10-28 20:38:45] INFO  validacion> ---------------------+----------+-----------+--------
+[2026-10-28 20:38:45] INFO  validacion>  totales_descudrados |        0 |         0 | OK
+[2026-10-28 20:38:45] INFO  validacion> (1 row)
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> --- 6. SECUENCIAS RESTAURADAS (last_value >= max(id)) ---
+[2026-10-28 20:38:45] INFO  validacion>               seq              | last_value | max_id | estado 
+[2026-10-28 20:38:45] INFO  validacion> -------------------------------+------------+--------+--------
+[2026-10-28 20:38:45] INFO  validacion>  categoria_id_categoria_seq    |         11 |     11 | OK
+[2026-10-28 20:38:45] INFO  validacion>  usuario_id_usuario_seq        |      20000 |  20000 | OK
+[2026-10-28 20:38:45] INFO  validacion>  producto_id_producto_seq      |      50000 |  50000 | OK
+[2026-10-28 20:38:45] INFO  validacion>  pedido_id_pedido_seq          |     200000 | 200000 | OK
+[2026-10-28 20:38:45] INFO  validacion>  detalle_pedido_id_detalle_seq |     400000 | 400000 | OK
+[2026-10-28 20:38:45] INFO  validacion> (5 rows)
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> --- 7. RESUMEN (PASS / FALLA:motivo) ---
+[2026-10-28 20:38:45] INFO  validacion>  case 
+[2026-10-28 20:38:45] INFO  validacion> ------
+[2026-10-28 20:38:45] INFO  validacion>  PASS
+[2026-10-28 20:38:45] INFO  validacion> (1 row)
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:45] INFO  validacion> 
+[2026-10-28 20:38:48] INFO  T1=2026-10-28 20:38:48.395 | validacion=PASS
+[2026-10-28 20:38:48] INFO  RTO=00:16 (16.7 s) | RPO=29:54 (1,794.5 s)
+[2026-10-28 20:38:48] INFO  RESULTADO=OK base=foodstore_restore_test dump=foodstore_20261028_2008.dump bytes=9378143 sha256=DA38B10B7C0F87D3EF3D018809543E80406B08A20EA702E3933B96C110BE096D validacion=PASS rto_s=16.7 rpo_s=1,794.5
+
+============================================================
+B. METRICAS
+============================================================
+Definiciones (SPEC_U6.md seccion 4):
+  RTO = desde inmediatamente antes del createdb hasta el fin de las validaciones.
+  RPO = antiguedad del .dump al momento de iniciar el cronometro.
+
+T0 (justo antes de createdb): 2026-10-28 20:38:31.651
+T1 (fin de validaciones):     2026-10-28 20:38:48.395
+RTO observado: 16,7 s (00:16)
+RPO observado: 1.794,5 s = 29 min 54 s (00:29:54)
+Nota de formato: el log del script usa cultura invariante y escribe los
+decimales con punto y la coma como separador de miles (16.7 / 1,794.5).
+Esta seccion B los repite con el formato local (16,7 / 1.794,5).
+
+Previstos para el laboratorio:
+  RTO previsto: <= 300 s (5 min). Observado: 16,7 s. Cumple.
+  RPO previsto: <= 24 h, porque el plan es respaldo diario a las 03:00.
+                Observado: 29 min 54 s. Cumple.
+  El RPO observado depende del momento del simulacro: se corrio 29 min
+  despues del respaldo. No representa el peor caso del plan (24 h).
+
+============================================================
+C. ESTADO FINAL Y VERIFICACION DE QUE foodstore NO SE TOCO
+============================================================
+--- foodstore_restore_test: check final ---
+PASS
+
+--- foodstore_restore_test: conteos ---
+categoria=11
+usuario=20000
+producto=50000
+pedido=200000
+detalle_pedido=400000
+
+--- tamano de ambas bases ---
+foodstore | 102 MB
+foodstore_restore_test | 80 MB
+
+--- foodstore (origen): sigue intacta ---
+categoria=11
+usuario=20000
+producto=50000
+pedido=200000
+detalle_pedido=400000
+
+--- foodstore: check de integridad ---
+PASS
+
+============================================================
+D. RESUMEN PASS/FAIL
+============================================================
+1. Base usada = foodstore_restore_test (nunca foodstore): PASS
+2. pg_restore --no-owner --no-privileges: PASS
+3. Conteos identicos al pre-respaldo (11/20.000/50.000/200.000/400.000): PASS
+4. Productos invalidos = 0: PASS
+5. Detalles invalidos = 0: PASS
+6. FK huerfanas = 0: PASS
+7. Totales descuadrados = 0: PASS
+8. Secuencias restauradas (last_value >= max id): PASS
+9. Validacion global: PASS
+10. RTO y RPO medidos y registrados: PASS
+11. foodstore intacta despues del simulacro (mismos conteos y check PASS): PASS
+============================================================

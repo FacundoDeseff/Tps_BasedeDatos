@@ -64,7 +64,7 @@ def build() -> None:
         canvas.saveState()
         canvas.setFont("Helvetica", 7)
         canvas.setFillColor("#777777")
-        canvas.drawString(1.6 * cm, 1.1 * cm, "TP Unidad 6 · Food Store · borrador de referencia (2026-10-28)")
+        canvas.drawString(1.6 * cm, 1.1 * cm, "TP Unidad 6 · Food Store · informe final (2026-10-28)")
         canvas.drawRightString(A4[0] - 1.6 * cm, 1.1 * cm, f"Pagina {doc.page}")
         canvas.restoreState()
 
