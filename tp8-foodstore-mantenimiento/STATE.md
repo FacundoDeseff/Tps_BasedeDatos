@@ -4,16 +4,17 @@
 
 - **Modalidad:** B. Cada integrante construye su parte desde cero y hace su propio commit. **No hay código de referencia de las Partes 2, 3 y 4 en el repositorio.**
 - **Tarea 1:** completada por **Matías** (especificación + reconstrucción de la base).
-- **Próximo integrante:** **Santi** (Parte 2, respaldo).
-- Después: **Facu Deseff** (Parte 3, monitoreo y mantenimiento) y **Facu Ramirez** (Parte 4, restauración y RTO/RPO).
+- **Tarea 2:** completada por **Santi** (respaldo automatizable, 2026-10-28).
+- **Próximo integrante:** **Facu Deseff** (Parte 3, monitoreo y mantenimiento).
+- Después: **Facu Ramirez** (Parte 4, restauración y RTO/RPO).
 
 ## Reparto y puntaje de la consigna
 
 | Integrante | Parte | Entregable principal | Puntos | Estado |
 |---|---|---|---|---|
 | **Matías** | 1 y 5 | `SPEC_U6.md`, `AGENTS.md`, `STATE.md`, reconstrucción de la base e `informe_u6.pdf` | 3,0 | Tarea 1 hecha; informe final pendiente de las Partes 2-4 |
-| **Santi** | 2 | `scripts/backup_foodstore.ps1` + evidencia | 2,0 | **Pendiente — siguiente** |
-| **Facu Deseff** | 3 | `sql/health_check.sql` y `sql/maintenance.sql` + evidencia | 2,0 | **Pendiente** |
+| **Santi** | 2 | `scripts/backup_foodstore.ps1` + evidencia | 2,0 | **Completada** — `docs/i2_backup_20261028_1656.txt` |
+| **Facu Deseff** | 3 | `sql/health_check.sql` y `sql/maintenance.sql` + evidencia | 2,0 | **Pendiente — siguiente** |
 | **Facu Ramirez** | 4 | `scripts/restore_test.ps1` y validaciones + RTO/RPO | 3,0 | **Pendiente** |
 
 ## Reglas para los cuatro
@@ -36,27 +37,30 @@
 
 ---
 
-## Tarea 2 — Santi: respaldo automatizable (PENDIENTE)
+## Tarea 2 — Santi: respaldo automatizable (COMPLETADA)
 
-**Objetivo:** script de respaldo diario, probado y con evidencia propia.
+**Entregables:** `scripts/backup_foodstore.ps1` y `docs/i2_backup_20261028_1656.txt`.
 
-**Prompt sugerido para OpenCode:**
-> «Leé `SPEC_U6.md` y `AGENTS.md`. Generá desde cero `scripts/backup_foodstore.ps1` para Windows: `pg_dump -Fc` de `foodstore`, nombre `foodstore_YYYYMMDD_HHMM.dump`, escritura en `.parcial` con rename sólo si `pg_dump` sale con código 0, log en `logs/`, salida con error si falla y sin contraseñas (usar `pgpass.conf` y `--no-password`). Después ejecutalo contra `localhost:5433` y mostrame el dump y el log.»
+**Hecho:**
+1. Script con `-Server -Port -User -Database -PgBin -BackupDir -LogDir -Retention`; `pg_dump -Fc --no-password` a `*.dump.parcial` y rename sólo con código 0; log diario en `logs/backup_YYYYMMDD.log` con `RESULTADO=OK/ERROR`; sin credenciales (usa `pgpass.conf`).
+2. **Camino de error** (`-Port 5999`): exit 1, `RESULTADO=ERROR`, 0 `.dump` y 0 `.parcial`, sólo el log.
+3. **Corrida real** contra `foodstore`: `RESULTADO=OK`, `foodstore_20261028_1656.dump` (8,94 MB / 9.378.194 bytes), 33 objetos en `pg_restore -l`, SHA-256 `0FCF7C4282C3442F6B53A3BA51EE5909A60E8C2FDA26D6E41FCC5299432FA136` (verificado con `Get-FileHash`).
+4. **Mejora obligatoria:** retención `-Retention N` (default 7) ordenada por `LastWriteTime`, probada con 8 `.dump` simulados → conservó 7 y borró los 2 más viejos informándolo en el log. Complemento documentado: alta diaria 03:00 en el Programador de tareas de Windows (ver abajo).
+5. Base reconstruida en la máquina de Santi con `sql/00_reconstruccion_foodstore.sql` (11/20.000/50.000/200.000/400.000, 102 MB), porque `foodstore` no existía en su instalación.
 
-**Pasos:**
-1. Crear el script en `scripts/backup_foodstore.ps1`.
-2. Probar el camino de error (por ejemplo `-Port 5999`): debe salir con código 1, sin `.dump` y sin `.parcial`.
-3. Ejecutar el respaldo real y verificar `RESULTADO=OK`, tamaño y SHA-256.
-4. Verificar que el dump sea legible con `pg_restore -l`.
-5. **Mejora obligatoria:** agregar política de retención (conservar los últimos N `.dump`) o documentar la programación diaria en el Programador de tareas.
-6. Guardar evidencia en `docs/i2_backup_<fecha>.txt`.
-7. Completar la sección I2 de `BITACORA.md`, actualizar este archivo y commitear.
+**Nota de entorno:** en la máquina de Santi PostgreSQL 17.11 escucha en **5432** (el 5433 es el de la máquina de Matías). El default del script sigue siendo 5433, según el SPEC; en esa máquina se ejecuta con `-Port 5432`.
 
-**Criterio de aceptación:** dump con nombre `foodstore_YYYYMMDD_HHMM.dump`, log con `RESULTADO=OK`, `.parcial` inexistente, `pg_restore -l` sin error y ninguna credencial en el código.
+**Traspaso a Facu Deseff:** último `.dump` en `backups/foodstore_20261028_1656.dump` (SHA-256 arriba). `pg_restore -l` lo lista sin error: 5 tablas, 5 secuencias, 5 `TABLE DATA`, 5 `SEQUENCE SET`, 6 PK/UNIQUE, 3 índices y 4 FK (33 objetos). Recordá que `backups/` y `logs/` no se versionan: generá tu propio dump con `.\scripts\backup_foodstore.ps1 -Port <puerto>` si necesitás uno.
+
+**Programación diaria (mejora documentada):**
+```powershell
+$accion  = New-ScheduledTaskAction -Execute 'powershell.exe' `
+  -Argument '-NoProfile -ExecutionPolicy Bypass -File "C:\ruta\al\tp8\scripts\backup_foodstore.ps1" -Port 5432'
+$trigger = New-ScheduledTaskTrigger -Daily -At 03:00
+Register-ScheduledTask -TaskName 'FoodStore-Backup' -Action $accion -Trigger $trigger -Description 'Respaldo diario de foodstore'
+```
 
 **Commit:** `feat(tp8): respaldo automatizable (Santi)`
-
-**Traspaso a Facu Deseff:** dejar la ruta del último `.dump` y el resultado de `pg_restore -l`.
 
 ---
 

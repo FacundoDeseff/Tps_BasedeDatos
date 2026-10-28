@@ -1,0 +1,184 @@
+﻿============================================================
+EVIDENCIA I2 - Respaldo automatizable de foodstore
+Integrante: Santi
+Fecha de ejecucion: 2026-10-28 16:56:40
+============================================================
+Script: scripts\backup_foodstore.ps1
+Windows PowerShell: 5.1.26100.9711
+pg_dump: pg_dump (PostgreSQL) 17.11
+Servidor local de esta maquina: localhost:5432 (el SPEC asume 5433, puerto de la maquina de Matias).
+Autenticacion: %APPDATA%\postgresql\pgpass.conf (no hay credenciales en el repositorio).
+
+============================================================
+A. CAMINO DE ERROR - puerto inexistente (localhost:5999, -BackupDir aislado)
+============================================================
+[2026-10-28 16:56:40] INFO  INICIO respaldo | servidor=localhost:5999 | usuario=postgres | base=foodstore | destino=C:\Users\Usuario\AppData\Local\Temp\i2_error_20261028_1656\foodstore_20261028_1656.dump | retencion=7
+[2026-10-28 16:56:40] INFO  Autenticacion: pgpass.conf (%APPDATA%\postgresql\pgpass.conf), sin contrasena en el script.
+[2026-10-28 16:56:40] INFO  Ejecutando: pg_dump -Fc --no-password -h localhost -p 5999 -U postgres -d foodstore -f C:\Users\Usuario\AppData\Local\Temp\i2_error_20261028_1656\foodstore_20261028_1656.dump.parcial
+[2026-10-28 16:56:45] ERROR pg_dump> pg_dump: error: connection to server at "localhost" (::1), port 5999 failed: Connection refused (0x0000274D/10061)
+[2026-10-28 16:56:45] ERROR pg_dump> 	Is the server running on that host and accepting TCP/IP connections?
+[2026-10-28 16:56:45] ERROR pg_dump> connection to server at "localhost" (127.0.0.1), port 5999 failed: Connection refused (0x0000274D/10061)
+[2026-10-28 16:56:45] ERROR pg_dump> 	Is the server running on that host and accepting TCP/IP connections?
+[2026-10-28 16:56:45] ERROR ERROR: pg_dump termino con codigo 1.
+[2026-10-28 16:56:45] WARN  Se elimino el archivo parcial incompleto: C:\Users\Usuario\AppData\Local\Temp\i2_error_20261028_1656\foodstore_20261028_1656.dump.parcial
+[2026-10-28 16:56:45] ERROR RESULTADO=ERROR parcial=C:\Users\Usuario\AppData\Local\Temp\i2_error_20261028_1656\foodstore_20261028_1656.dump.parcial
+
+EXITCODE=1
+
+============================================================
+A.b Verificacion del camino de error
+============================================================
+PASS: exit 1 y sin .dump ni .parcial
+Archivos generados en la carpeta aislada de la prueba (debe ser solo el log):
+
+Name               
+----               
+backup_20261028.log
+dumps o parciales generados: 0
+
+============================================================
+B. RESPALDO REAL sobre foodstore (localhost:5432)
+============================================================
+[2026-10-28 16:56:45] INFO  INICIO respaldo | servidor=localhost:5432 | usuario=postgres | base=foodstore | destino=C:\Users\Usuario\Desktop\global\Cosas Facultad\Base de Datos II\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_1656.dump | retencion=7
+[2026-10-28 16:56:45] INFO  Autenticacion: pgpass.conf (%APPDATA%\postgresql\pgpass.conf), sin contrasena en el script.
+[2026-10-28 16:56:45] INFO  Ejecutando: pg_dump -Fc --no-password -h localhost -p 5432 -U postgres -d foodstore -f C:\Users\Usuario\Desktop\global\Cosas Facultad\Base de Datos II\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_1656.dump.parcial
+[2026-10-28 16:56:47] INFO  Dump generado: C:\Users\Usuario\Desktop\global\Cosas Facultad\Base de Datos II\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_1656.dump (8.94 MB)
+[2026-10-28 16:56:47] INFO  SHA256=0FCF7C4282C3442F6B53A3BA51EE5909A60E8C2FDA26D6E41FCC5299432FA136
+[2026-10-28 16:56:47] INFO  pg_restore -l OK | objetos=33
+[2026-10-28 16:56:47] INFO  Retencion: no hay archivos para borrar (se conservan hasta 7).
+[2026-10-28 16:56:47] INFO  Dumps disponibles: 1
+[2026-10-28 16:56:47] INFO  RESULTADO=OK archivo=foodstore_20261028_1656.dump tamano_mb=8.94 sha256=0FCF7C4282C3442F6B53A3BA51EE5909A60E8C2FDA26D6E41FCC5299432FA136
+
+EXITCODE=0
+
+============================================================
+B.b Verificacion del respaldo
+============================================================
+PASS: RESULTADO=OK y dump presente
+archivo: foodstore_20261028_1656.dump
+tamano bytes: 9378194
+ultima escritura: 2026-10-28 16:56:47
+
+============================================================
+C. Artefacto generado
+============================================================
+--- Contenido de backups/ ---
+
+Name                          Length LastWriteTime      
+----                          ------ -------------      
+foodstore_20261028_1656.dump 9378194 28/10/2026 16:56:47
+
+--- Archivos .parcial (debe ser 0) ---
+0
+
+--- SHA-256 calculado de forma independiente (Get-FileHash) ---
+0FCF7C4282C3442F6B53A3BA51EE5909A60E8C2FDA26D6E41FCC5299432FA136
+
+--- pg_restore -l (salida completa) ---
+;
+; Archive created at 2026-10-28 16:56:45
+;     dbname: foodstore
+;     TOC Entries: 37
+;     Compression: gzip
+;     Dump Version: 1.16-0
+;     Format: CUSTOM
+;     Integer: 4 bytes
+;     Offset: 8 bytes
+;     Dumped from database version: 17.11
+;     Dumped by pg_dump version: 17.11
+;
+;
+; Selected TOC Entries:
+;
+218; 1259 16730 TABLE public categoria postgres
+217; 1259 16729 SEQUENCE public categoria_id_categoria_seq postgres
+226; 1259 16775 TABLE public detalle_pedido postgres
+225; 1259 16774 SEQUENCE public detalle_pedido_id_detalle_seq postgres
+224; 1259 16761 TABLE public pedido postgres
+223; 1259 16760 SEQUENCE public pedido_id_pedido_seq postgres
+220; 1259 16739 TABLE public producto postgres
+219; 1259 16738 SEQUENCE public producto_id_producto_seq postgres
+222; 1259 16754 TABLE public usuario postgres
+221; 1259 16753 SEQUENCE public usuario_id_usuario_seq postgres
+4939; 0 16730 TABLE DATA public categoria postgres
+4947; 0 16775 TABLE DATA public detalle_pedido postgres
+4945; 0 16761 TABLE DATA public pedido postgres
+4941; 0 16739 TABLE DATA public producto postgres
+4943; 0 16754 TABLE DATA public usuario postgres
+4954; 0 0 SEQUENCE SET public categoria_id_categoria_seq postgres
+4955; 0 0 SEQUENCE SET public detalle_pedido_id_detalle_seq postgres
+4956; 0 0 SEQUENCE SET public pedido_id_pedido_seq postgres
+4957; 0 0 SEQUENCE SET public producto_id_producto_seq postgres
+4958; 0 0 SEQUENCE SET public usuario_id_usuario_seq postgres
+4775; 2606 16737 CONSTRAINT public categoria categoria_nombre_key postgres
+4777; 2606 16735 CONSTRAINT public categoria categoria_pkey postgres
+4787; 2606 16782 CONSTRAINT public detalle_pedido detalle_pedido_pkey postgres
+4785; 2606 16768 CONSTRAINT public pedido pedido_pkey postgres
+4780; 2606 16747 CONSTRAINT public producto producto_pkey postgres
+4782; 2606 16759 CONSTRAINT public usuario usuario_pkey postgres
+4788; 1259 16795 INDEX public idx_detalle_producto postgres
+4783; 1259 16794 INDEX public idx_pedido_usuario postgres
+4778; 1259 16793 INDEX public idx_producto_categoria_vig postgres
+4791; 2606 16783 FK CONSTRAINT public detalle_pedido detalle_pedido_pedido_id_fkey postgres
+4792; 2606 16788 FK CONSTRAINT public detalle_pedido detalle_pedido_producto_id_fkey postgres
+4790; 2606 16769 FK CONSTRAINT public pedido pedido_usuario_id_fkey postgres
+4789; 2606 16748 FK CONSTRAINT public producto producto_id_categoria_fkey postgres
+ EXITCODE=0 objetos listados: 33
+
+============================================================
+D. MEJORA - politica de retencion (-Retention 7, valor por defecto)
+============================================================
+Se preparan 8 dumps simulados (fechas 02/10 a 09/10) y se ejecuta el respaldo real sobre esa carpeta:
+el script debe conservar los 7 mas recientes e informar que elimino el resto.
+
+--- antes (8 simulados) ---
+
+Name                        
+----                        
+foodstore_20261001_0300.dump
+foodstore_20261002_0300.dump
+foodstore_20261003_0300.dump
+foodstore_20261004_0300.dump
+foodstore_20261005_0300.dump
+foodstore_20261006_0300.dump
+foodstore_20261007_0300.dump
+foodstore_20261008_0300.dump
+
+[2026-10-28 16:56:48] INFO  INICIO respaldo | servidor=localhost:5432 | usuario=postgres | base=foodstore | destino=C:\Users\Usuario\AppData\Local\Temp\retencion_i2_20261028_1656\foodstore_20261028_1656.dump | retencion=7
+[2026-10-28 16:56:48] INFO  Autenticacion: pgpass.conf (%APPDATA%\postgresql\pgpass.conf), sin contrasena en el script.
+[2026-10-28 16:56:48] INFO  Ejecutando: pg_dump -Fc --no-password -h localhost -p 5432 -U postgres -d foodstore -f C:\Users\Usuario\AppData\Local\Temp\retencion_i2_20261028_1656\foodstore_20261028_1656.dump.parcial
+[2026-10-28 16:56:50] INFO  Dump generado: C:\Users\Usuario\AppData\Local\Temp\retencion_i2_20261028_1656\foodstore_20261028_1656.dump (8.94 MB)
+[2026-10-28 16:56:50] INFO  SHA256=B39C8CCC3E929BA01215468DEE6FC75AA7FEE3592513599ED30D674B44CFB449
+[2026-10-28 16:56:50] INFO  pg_restore -l OK | objetos=33
+[2026-10-28 16:56:50] INFO  Retencion: eliminado foodstore_20261002_0300.dump (2026-10-03 00:00)
+[2026-10-28 16:56:50] INFO  Retencion: eliminado foodstore_20261001_0300.dump (2026-10-02 00:00)
+[2026-10-28 16:56:50] INFO  Retencion: se conservan los ultimos 7 .dump.
+[2026-10-28 16:56:50] INFO  Dumps disponibles: 7
+[2026-10-28 16:56:50] INFO  RESULTADO=OK archivo=foodstore_20261028_1656.dump tamano_mb=8.94 sha256=B39C8CCC3E929BA01215468DEE6FC75AA7FEE3592513599ED30D674B44CFB449
+
+EXITCODE=0
+
+--- despues (debe quedar en 7) ---
+
+Name                        
+----                        
+foodstore_20261003_0300.dump
+foodstore_20261004_0300.dump
+foodstore_20261005_0300.dump
+foodstore_20261006_0300.dump
+foodstore_20261007_0300.dump
+foodstore_20261008_0300.dump
+foodstore_20261028_1656.dump
+
+cantidad final: 7
+
+============================================================
+RESUMEN DE VALIDACIONES
+============================================================
+A. Camino de error (puerto 5999): PASS: exit 1 y sin .dump ni .parcial
+B. Respaldo real: PASS: RESULTADO=OK y dump presente
+C. Dump legible / sin .parcial: PASS: dump legible y sin .parcial
+D. Retencion de los ultimos 7: PASS: 9 archivos -> 7 conservados
+
+Dump entregado a Facu Ramirez para el simulacro: C:\Users\Usuario\Desktop\global\Cosas Facultad\Base de Datos II\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_1656.dump
+SHA256 a verificar: 0FCF7C4282C3442F6B53A3BA51EE5909A60E8C2FDA26D6E41FCC5299432FA136

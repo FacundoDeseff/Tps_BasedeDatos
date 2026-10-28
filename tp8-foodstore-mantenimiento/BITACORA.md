@@ -26,14 +26,23 @@ se resuelve con `%APPDATA%\postgresql\pgpass.conf`.
 
 ### Santi — Respaldo automatizable (Parte 2)
 
-Prompt sugerido: «Leé `SPEC_U6.md` y `AGENTS.md`. Generá desde cero `scripts/backup_foodstore.ps1`
+Prompt enviado: «Leé `SPEC_U6.md` y `AGENTS.md`. Generá desde cero `scripts/backup_foodstore.ps1`
 para Windows con `pg_dump -Fc`, nombre `foodstore_YYYYMMDD_HHMM.dump`, escritura en `.parcial`
 con rename sólo si termina bien, log en `logs/`, salida con error si falla y sin contraseñas.
-Después ejecutalo contra `foodstore` en `localhost:5433` y mostrame el dump y el log.»
+Después ejecutalo contra `foodstore` y mostrame el dump y el log.»
 
 | Prompt enviado a la IA | Respuesta relevante (resumida) | Validación o corrección humana aplicada |
 |---|---|---|
-| _(pendiente)_ | _(pendiente)_ | _(pendiente: prueba de error con un puerto inexistente, ejecución real, `pg_restore -l` y retención)_ |
+| «Leé `SPEC_U6.md` y `AGENTS.md`. Generá desde cero `scripts/backup_foodstore.ps1`… (prompt completo arriba)» | Escribió el script con parámetros `-Server -Port -User -Database -PgBin -BackupDir -LogDir -Retention`: `pg_dump -Fc --no-password` a `*.dump.parcial`, rename sólo con código 0, log por día en `logs/backup_YYYYMMDD.log` con `RESULTADO=OK/ERROR`, verificación con `pg_restore -l`, SHA-256 y retención de los últimos N `.dump`. Detectó que en PowerShell 5.1 un exit code distinto de 0 de un `.exe` **no** dispara `try/catch`, así que el script chequea `$LASTEXITCODE` y baja `$ErrorActionPreference` alrededor de las llamadas nativas para que el `stderr` de `pg_dump` no se convierta en excepción. | Se **revisó** línea por línea antes de ejecutar: ningún `VACUUM`, ningún `DROP`, ninguna contraseña, `$ErrorActionPreference = 'Stop'`, `--no-password` y `.parcial` limpiado en `catch` y en `finally`. Se verificó que `backups/`, `logs/` y `*.parcial` sigan en `.gitignore` (`git check-ignore -v`). |
+| «Ejecutalo y probá también el camino de error.» | Propuso `-Port 5999` para el fallo y `-Port 5432` para la corrida real. | **Camino de error** (`-Port 5999`, `-BackupDir` aislado): `EXITCODE=1`, `RESULTADO=ERROR`, **0** archivos `.dump` y **0** `.parcial` en la carpeta; sólo quedó el log. **Corrida real** (`-Port 5432`): `EXITCODE=0`, `RESULTADO=OK`, `foodstore_20261028_1656.dump` de 8,94 MB (9.378.194 bytes), 33 objetos listados por `pg_restore -l`, SHA-256 `0FCF7C42…9432FA136` recalculado aparte con `Get-FileHash` y coincidente. **Retención** (`-Retention 7`): con 8 `.dump` simulados más el nuevo conservó 7 y borró los 2 más viejos. Evidencia cruda: `docs/i2_backup_20261028_1656.txt`. |
+| «La base no existía en mi máquina; verificala antes de respaldar.» | Indicó que en esta máquina PostgreSQL 17.11 escucha en **5432**, no en 5433, y que `foodstore` no estaba creada. | Se creó `foodstore` y se ejecutó `sql/00_reconstruccion_foodstore.sql` con `ON_ERROR_STOP=1`: 11 categorías, 20.000 usuarios, 50.000 productos, 200.000 pedidos, 400.000 detalles, 102 MB (idéntico a `docs/i1_*`), y recién después se corrió el respaldo. |
+
+**Errores reales detectados y corregidos.** (1) La primera versión de la evidencia volcaba la
+salida completa de `pg_restore -l` en una sola línea y mezclaba los restos del camino de error
+con la carpeta real de respaldos, con lo que no se podía asegurar si el fallo había dejado un
+archivo: se aisló la prueba de error en un directorio temporal y se unió la salida línea por
+línea. (2) El `-Port` por defecto del SPEC (5433) no corresponde a esta máquina (5432): se
+mantiene el default del equipo y se pasa el puerto explícito, documentado en la evidencia.
 
 ### Facu Deseff — Monitoreo y mantenimiento (Parte 3)
 

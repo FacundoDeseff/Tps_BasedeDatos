@@ -9,7 +9,7 @@ con medición de RTO/RPO.
 | Integrante | Parte | Entregable | Estado |
 |---|---|---|---|
 | **Matías** | 1 y 5 | especificación, reconstrucción de la base e informe final | Parte 1 hecha; informe pendiente |
-| **Santi** | 2 | respaldo automatizable | pendiente |
+| **Santi** | 2 | respaldo automatizable | hecho (`docs/i2_backup_20261028_1656.txt`) |
 | **Facu Deseff** | 3 | monitoreo y mantenimiento | pendiente |
 | **Facu Ramirez** | 4 | restauración, validaciones y RTO/RPO | pendiente |
 
@@ -41,6 +41,7 @@ tp8-foodstore-mantenimiento/
 ├── sql/
 │   └── 00_reconstruccion_foodstore.sql   esquema + datos reproducibles (Matías)
 ├── scripts/
+│   ├── backup_foodstore.ps1             respaldo diario con pg_dump -Fc y retención (Santi)
 │   └── generar_informe_pdf.py            exporta el informe a PDF (Matías)
 ├── docs/                                 evidencias (salidas reales)
 ├── backups/                              .dump generados (no versionados)
