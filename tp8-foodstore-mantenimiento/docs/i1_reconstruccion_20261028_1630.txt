@@ -1,0 +1,50 @@
+============================================================
+EVIDENCIA I1 - Reconstruccion de la base foodstore
+Integrante: Matias
+============================================================
+   base    |        fecha_ejecucion        |                                  motor                                   
+-----------+-------------------------------+--------------------------------------------------------------------------
+ foodstore | 2026-10-28 16:33:13.625976-03 | PostgreSQL 17.11 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit
+(1 row)
+
+
+--- Tamano de la base ---
+ tamano_base 
+-------------
+ 105 MB
+(1 row)
+
+
+--- Conteos por tabla ---
+     tabla      | filas  
+----------------+--------
+ categoria      |     11
+ usuario        |  20000
+ producto       |  50000
+ pedido         | 200000
+ detalle_pedido | 400000
+(5 rows)
+
+
+--- Integridad ---
+ productos_invalidos | detalles_invalidos | detalles_huerfanos | pedidos_sin_detalle | totales_descuadrados 
+---------------------+--------------------+--------------------+---------------------+----------------------
+                   0 |                  0 |                  0 |                   0 |                    0
+(1 row)
+
+
+--- Secuencias identity ---
+     tabla      | ultimo_valor | max_id 
+----------------+--------------+--------
+ categoria      |           11 |     11
+ usuario        |        20000 |  20000
+ producto       |        50000 |  50000
+ pedido         |       200000 | 200000
+ detalle_pedido |       400000 | 400000
+(5 rows)
+
+
+--- Resultado esperado ---
+categoria=11 usuario=20000 producto=50000 pedido=200000 detalle_pedido=400000
+productos_invalidos=0 detalles_invalidos=0 detalles_huerfanos=0 pedidos_sin_detalle=0 totales_descuadrados=0
+ultimo_valor = max_id en las cinco secuencias

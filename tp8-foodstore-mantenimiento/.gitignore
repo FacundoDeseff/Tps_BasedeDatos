@@ -1,0 +1,4 @@
+# Respaldos y logs: no forman parte de la entrega (se regeneran con los scripts)
+backups/
+logs/
+*.parcial
