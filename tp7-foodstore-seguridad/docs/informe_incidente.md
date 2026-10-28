@@ -110,16 +110,21 @@ reales y sin claves utilizables.
 
 ## 5. Reconstrucción con IA (C.4)
 
-**Pendiente de ejecución.** El prompt es exactamente el siguiente, seguido del
-contenido completo de `docs/log_simulacro_anonimizado.txt`, sin agregar contexto:
+Se entregó el fragmento anonimizado a una **sesión nueva** del asistente
+(OpenCode), sin contexto previo del trabajo y sin agregar nada más que el prompt
+de la consigna:
 
 ```text
 Este es un fragmento de log de un servidor PostgreSQL. Reconstruí qué ocurrió
 y proponé una hipótesis de contención.
 ```
 
-La respuesta completa, sin editar, debe guardarse en
-`docs/respuesta_ia_simulacro.md` y no debe ejecutarse nada de lo que sugiera.
+Se transcribieron sólo las 26 líneas de log. Se omitió la cabecera del archivo
+(líneas 1 a 15) porque nombra la Parte C.3, el simulacro y el script: son
+metadatos del archivo, no líneas de log, y habrían condicionado la
+reconstrucción. La decisión está fundada en `docs/respuesta_ia_simulacro.md`,
+donde quedaron el prompt, la entrada enviada y la respuesta **completa y sin
+editar**. No se ejecutó ninguna de las acciones que la IA sugirió.
 
 ## 6. Contraste entre la reconstrucción y lo ejecutado (C.5)
 
@@ -147,13 +152,32 @@ sustentada y debe marcarse como tal.
 
 | Qué acertó | Qué omitió | Qué afirmó sin sustento |
 |---|---|---|
-| *(a completar con la respuesta de C.4)* | *(idem)* | *(idem)* |
+| La secuencia completa y su orden. Que la identidad era `app_web`, sobre `copia_trabajo`, desde `::1`, con `psql` y una sesión de 0,092 s. Que las dos lecturas de `usuario` fueron denegadas, es decir que por esa vía **no** hubo lectura de datos. Que los dos `GRANT admin_datos` fueron denegados por falta de `ADMIN OPTION`. El patrón de escalamiento vertical con intento de persistencia vía `rol_soporte`. Que `log_statement = 'all'` deja el literal de las sentencias en el log (activo sensible, Parte B.4). | Que el log **no registra el valor devuelto** por `fn_autenticar`; presenta el quinto intento como exitoso sin aclarar que lo infiere. No distinguió la autenticación de la aplicación (`fn_autenticar`, sobre un usuario de la tabla) de la del motor (`scram-sha-256`, sobre el rol `app_web`). No advirtió que el fragmento ya venía seudonimizado. No señaló que `rol_soporte` es un rol de grupo sin login, con lo cual el "movimiento lateral" es sólo una hipótesis y no un paso consumado. | "Una sola sesión, **83 ms** en total": la sesión duró 0,092 s, o sea 92 ms. "5º intento con `clave_sintetica_05` → **login de aplicación exitoso**": el log no registra resultados; el éxito sólo lo prueba la salida de `psql` de `docs/pruebas_simulacro.txt`, que no se le entregó. "No hay throttling/lockout tras 4 fallos": el log no permite saberlo y, de hecho, `fn_autenticar` bloquea al quinto fallo. "El 'éxito' del 5º login es el caso positivo que el script necesitaba": atribuye diseño e intención a quien escribió el script. "Contraseñas en texto plano": lo que el log prueba es que registra el literal de la sentencia, no que la clave sea utilizable. "Si `copia_trabajo` es un restore de producción…": especulación sobre el origen de la base (queda marcada como condicional, pero el log no lo dice). |
+
+Sobre la hipótesis: la IA se inclinó por "test controlado de seguridad" y ofreció
+como alternativa "credencial filtrada de `app_web`". La primera coincide con lo
+que realmente ocurrió, pero **el fragmento no la prueba**: los nombres sintéticos,
+los marcadores `INICIO_C`/`FIN_C` y la base "copia" también son compatibles con un
+atacante que usa un script prearmado. El equipo sabe que fue un simulacro porque
+lo ejecutó, no porque el log lo demuestre.
+
+Lo más valioso de la respuesta no es la reconstrucción sino la contención: las
+diez medidas propuestas son verificables y no destructivas, y varias —revisar
+`pg_auth_members`, los atributos de `app_web`, el origen en `pg_hba.conf`— son
+exactamente las que el equipo adopta en la sección 7. La respuesta también acierta
+en algo que el equipo no había anotado: el umbral de bloqueo no se puede evaluar
+desde el log, hace falta mirar `intentos_fallidos`.
 
 ## 7. Decisión de contención del equipo (C.6)
 
-> Borrador para revisión del equipo antes de entregar. La decisión es del equipo
-> y se toma a partir de la evidencia; no se ejecutó ninguna acción automática a
-> partir de una sugerencia de IA.
+**La decisión es del equipo.** Se toma a partir de la evidencia del log y de la
+salida de `psql`, no de la sugerencia de la IA. Ninguna de las diez medidas que
+propuso el asistente se ejecutó automáticamente: se leyeron, se contrastaron
+(sección 6) y recién después el equipo armó su propio orden de intervención, que
+coincide en lo esencial pero no lo copia: se descartan por ahora las medidas de
+mediano plazo (migrar a `pgaudit`, redactar parámetros del log) por estar fuera
+del alcance del TP, y se descarta cualquier acción destructiva, como revertir
+roles o borrar datos, sobre una hipótesis.
 
 En un caso real, el orden de intervención sería:
 
@@ -183,4 +207,5 @@ desarrollo y la evidencia ya quedó preservada en el repositorio.
 - `docs/log_simulacro_anonimizado.txt` — fragmento del log, anonimizado.
 - `docs/pruebas_simulacro.txt` — salida de `psql`: prueba del login exitoso y de
   las cuatro denegaciones.
-- Respuesta de la IA (C.4) y contraste completo (C.5) — pendientes de completar.
+- `docs/respuesta_ia_simulacro.md` — prompt, entrada enviada y respuesta de la IA
+  completa y sin editar (C.4).
