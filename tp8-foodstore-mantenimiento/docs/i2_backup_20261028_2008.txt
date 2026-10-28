@@ -1,0 +1,266 @@
+============================================================
+EVIDENCIA I2 - Respaldo automatizable de foodstore
+Integrante: Santi (Tarea 2 / I2)
+Fecha de ejecucion: 2026-10-28 19:54:29 a 20:08:38 (hora local)
+  - camino de error: 19:54:29 a 19:54:34
+  - respaldo real:   20:08:27 a 20:08:38
+Maquina: FACU (usuario facun)
+Sistema: Windows, PowerShell 5.1.26100.9711
+Version de psql: psql (PostgreSQL) 17.11
+Puerto usado: localhost:5432 (el 5433 no responde en esta maquina)
+Autenticacion: %APPDATA%\postgresql\pgpass.conf (sin credenciales en el repo)
+Script: scripts\backup_foodstore.ps1 (HEAD 866c2ea)
+Ruta del dump: C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_2008.dump
+Nota de entorno: foodstore existia con el esquema viejo de TPs anteriores y sin
+la tabla usuario (0 filas en las 5 tablas). Se reconstruyo con
+sql/00_reconstruccion_foodstore.sql antes del respaldo real. Detalle crudo en el
+ANEXO, al final del archivo.
+============================================================
+
+============================================================
+A. CAMINO DE ERROR - puerto inexistente (localhost:5999, -BackupDir y -LogDir aislados en %TEMP%)
+============================================================
+Comando ejecutado:
+  .\scripts\backup_foodstore.ps1 -Port 5999 -BackupDir "%TEMP%\i2_err_20261028_1953\backups" -LogDir "%TEMP%\i2_err_20261028_1953\logs"
+
+[2026-10-28 19:54:29] INFO  INICIO respaldo | servidor=localhost:5999 | usuario=postgres | base=foodstore | destino=C:\Users\facun\AppData\Local\Temp\i2_err_20261028_1953\backups\foodstore_20261028_1954.dump | retencion=7
+[2026-10-28 19:54:29] INFO  Autenticacion: pgpass.conf (%APPDATA%\postgresql\pgpass.conf), sin contrasena en el script.
+[2026-10-28 19:54:29] INFO  Ejecutando: pg_dump -Fc --no-password --lock-wait-timeout=30s -h localhost -p 5999 -U postgres -d foodstore -f C:\Users\facun\AppData\Local\Temp\i2_err_20261028_1953\backups\foodstore_20261028_195429.dump.parcial
+[2026-10-28 19:54:34] ERROR pg_dump> pg_dump: error: connection to server at "localhost" (::1), port 5999 failed: Connection refused (0x0000274D/10061)
+[2026-10-28 19:54:34] ERROR pg_dump> 	Is the server running on that host and accepting TCP/IP connections?
+[2026-10-28 19:54:34] ERROR pg_dump> connection to server at "localhost" (127.0.0.1), port 5999 failed: Connection refused (0x0000274D/10061)
+[2026-10-28 19:54:34] ERROR pg_dump> 	Is the server running on that host and accepting TCP/IP connections?
+[2026-10-28 19:54:34] ERROR ERROR: pg_dump termino con codigo 1.
+[2026-10-28 19:54:34] WARN  Se elimino el archivo parcial incompleto: C:\Users\facun\AppData\Local\Temp\i2_err_20261028_1953\backups\foodstore_20261028_195429.dump.parcial
+[2026-10-28 19:54:34] ERROR RESULTADO=ERROR parcial=eliminado
+
+EXITCODE=1
+
+--- Contenido de la carpeta de dumps aislada (C:/Users/facun/AppData/Local/Temp/i2_err_20261028_1953\backups) ---
+total 0
+drwxr-xr-x 1 facun 197609 0 Oct 28 19:54 .
+drwxr-xr-x 1 facun 197609 0 Oct 28 19:54 ..
+dumps=0
+parciales=0
+
+--- Contenido de la carpeta de logs aislada (C:/Users/facun/AppData/Local/Temp/i2_err_20261028_1953\logs) ---
+total 4
+drwxr-xr-x 1 facun 197609    0 Oct 28 19:54 .
+drwxr-xr-x 1 facun 197609    0 Oct 28 19:54 ..
+-rw-r--r-- 1 facun 197609 1403 Oct 28 19:54 backup_20261028.log
+
+============================================================
+B. RESPALDO REAL sobre foodstore (localhost:5432)
+============================================================
+Comando ejecutado:
+  .\scripts\backup_foodstore.ps1 -Port 5432
+
+[2026-10-28 20:08:27] INFO  INICIO respaldo | servidor=localhost:5432 | usuario=postgres | base=foodstore | destino=C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_2008.dump | retencion=7
+[2026-10-28 20:08:27] INFO  Autenticacion: pgpass.conf (%APPDATA%\postgresql\pgpass.conf), sin contrasena en el script.
+[2026-10-28 20:08:27] INFO  Ejecutando: pg_dump -Fc --no-password --lock-wait-timeout=30s -h localhost -p 5432 -U postgres -d foodstore -f C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_200827.dump.parcial
+[2026-10-28 20:08:37] INFO  Dump escrito en .parcial: C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_200827.dump.parcial (8.94 MB)
+[2026-10-28 20:08:37] INFO  pg_restore -l OK | objetos=33 | tablas=categoria,producto,usuario,pedido,detalle_pedido
+[2026-10-28 20:08:38] INFO  Dump generado: C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_2008.dump (8.94 MB)
+[2026-10-28 20:08:38] INFO  SHA256=DA38B10B7C0F87D3EF3D018809543E80406B08A20EA702E3933B96C110BE096D
+[2026-10-28 20:08:38] INFO  Retencion: no hay archivos para borrar (se conservan hasta 7).
+[2026-10-28 20:08:38] INFO  Dumps disponibles de 'foodstore': 1
+[2026-10-28 20:08:38] INFO  RESULTADO=OK archivo=foodstore_20261028_2008.dump tamano_mb=8.94 sha256=DA38B10B7C0F87D3EF3D018809543E80406B08A20EA702E3933B96C110BE096D
+
+EXITCODE=0
+
+--- Log completo del dia (logs\backup_20261028.log) ---
+﻿[2026-10-28 19:55:18] INFO  INICIO respaldo | servidor=localhost:5432 | usuario=postgres | base=foodstore | destino=C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_1955.dump | retencion=7
+[2026-10-28 19:55:18] INFO  Autenticacion: pgpass.conf (%APPDATA%\postgresql\pgpass.conf), sin contrasena en el script.
+[2026-10-28 19:55:18] INFO  Ejecutando: pg_dump -Fc --no-password --lock-wait-timeout=30s -h localhost -p 5432 -U postgres -d foodstore -f C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_195518.dump.parcial
+[2026-10-28 19:55:20] INFO  Dump escrito en .parcial: C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_195518.dump.parcial (0.01 MB)
+[2026-10-28 19:55:21] ERROR ERROR: El dump no contiene las tablas esperadas: usuario
+[2026-10-28 19:55:21] WARN  Se elimino el archivo parcial incompleto: C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_195518.dump.parcial
+[2026-10-28 19:55:21] ERROR RESULTADO=ERROR parcial=eliminado
+[2026-10-28 20:08:27] INFO  INICIO respaldo | servidor=localhost:5432 | usuario=postgres | base=foodstore | destino=C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_2008.dump | retencion=7
+[2026-10-28 20:08:27] INFO  Autenticacion: pgpass.conf (%APPDATA%\postgresql\pgpass.conf), sin contrasena en el script.
+[2026-10-28 20:08:27] INFO  Ejecutando: pg_dump -Fc --no-password --lock-wait-timeout=30s -h localhost -p 5432 -U postgres -d foodstore -f C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_200827.dump.parcial
+[2026-10-28 20:08:37] INFO  Dump escrito en .parcial: C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_200827.dump.parcial (8.94 MB)
+[2026-10-28 20:08:37] INFO  pg_restore -l OK | objetos=33 | tablas=categoria,producto,usuario,pedido,detalle_pedido
+[2026-10-28 20:08:38] INFO  Dump generado: C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_2008.dump (8.94 MB)
+[2026-10-28 20:08:38] INFO  SHA256=DA38B10B7C0F87D3EF3D018809543E80406B08A20EA702E3933B96C110BE096D
+[2026-10-28 20:08:38] INFO  Retencion: no hay archivos para borrar (se conservan hasta 7).
+[2026-10-28 20:08:38] INFO  Dumps disponibles de 'foodstore': 1
+[2026-10-28 20:08:38] INFO  RESULTADO=OK archivo=foodstore_20261028_2008.dump tamano_mb=8.94 sha256=DA38B10B7C0F87D3EF3D018809543E80406B08A20EA702E3933B96C110BE096D
+
+--- Verificacion del respaldo ---
+--- backups/ ---
+total 9164
+drwxr-xr-x 1 facun 197609       0 Oct 28 20:08 .
+drwxr-xr-x 1 facun 197609       0 Oct 28 19:55 ..
+-rw-r--r-- 1 facun 197609 9378143 Oct 28 20:08 foodstore_20261028_2008.dump
+parciales=0
+
+============================================================
+C. ARTEFACTO GENERADO
+============================================================
+--- Archivo (Get-Item) ---
+
+
+Name          : foodstore_20261028_2008.dump
+Length        : 9378143
+LastWriteTime : 10/28/2026 8:08:37 PM
+CreationTime  : 10/28/2026 8:08:28 PM
+
+
+
+
+--- SHA-256 calculado de forma independiente (Get-FileHash) ---
+
+
+Algorithm : SHA256
+Hash      : DA38B10B7C0F87D3EF3D018809543E80406B08A20EA702E3933B96C110BE096D
+Path      : C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\f
+            oodstore_20261028_2008.dump
+
+
+
+
+--- Comparacion con el SHA-256 registrado por el log ---
+Get-FileHash=DA38B10B7C0F87D3EF3D018809543E80406B08A20EA702E3933B96C110BE096D
+log         =DA38B10B7C0F87D3EF3D018809543E80406B08A20EA702E3933B96C110BE096D
+COMPARACION=PASS (coinciden)
+
+--- pg_restore -l (salida completa) ---
+;
+; Archive created at 2026-10-28 20:08:28
+;     dbname: foodstore
+;     TOC Entries: 37
+;     Compression: gzip
+;     Dump Version: 1.16-0
+;     Format: CUSTOM
+;     Integer: 4 bytes
+;     Offset: 8 bytes
+;     Dumped from database version: 17.11
+;     Dumped by pg_dump version: 17.11
+;
+;
+; Selected TOC Entries:
+;
+218; 1259 41070 TABLE public categoria postgres
+217; 1259 41069 SEQUENCE public categoria_id_categoria_seq postgres
+226; 1259 41115 TABLE public detalle_pedido postgres
+225; 1259 41114 SEQUENCE public detalle_pedido_id_detalle_seq postgres
+224; 1259 41101 TABLE public pedido postgres
+223; 1259 41100 SEQUENCE public pedido_id_pedido_seq postgres
+220; 1259 41079 TABLE public producto postgres
+219; 1259 41078 SEQUENCE public producto_id_producto_seq postgres
+222; 1259 41094 TABLE public usuario postgres
+221; 1259 41093 SEQUENCE public usuario_id_usuario_seq postgres
+4939; 0 41070 TABLE DATA public categoria postgres
+4947; 0 41115 TABLE DATA public detalle_pedido postgres
+4945; 0 41101 TABLE DATA public pedido postgres
+4941; 0 41079 TABLE DATA public producto postgres
+4943; 0 41094 TABLE DATA public usuario postgres
+4954; 0 0 SEQUENCE SET public categoria_id_categoria_seq postgres
+4955; 0 0 SEQUENCE SET public detalle_pedido_id_detalle_seq postgres
+4956; 0 0 SEQUENCE SET public pedido_id_pedido_seq postgres
+4957; 0 0 SEQUENCE SET public producto_id_producto_seq postgres
+4958; 0 0 SEQUENCE SET public usuario_id_usuario_seq postgres
+4775; 2606 41077 CONSTRAINT public categoria categoria_nombre_key postgres
+4777; 2606 41075 CONSTRAINT public categoria categoria_pkey postgres
+4787; 2606 41122 CONSTRAINT public detalle_pedido detalle_pedido_pkey postgres
+4785; 2606 41108 CONSTRAINT public pedido pedido_pkey postgres
+4780; 2606 41087 CONSTRAINT public producto producto_pkey postgres
+4782; 2606 41099 CONSTRAINT public usuario usuario_pkey postgres
+4788; 1259 41135 INDEX public idx_detalle_producto postgres
+4783; 1259 41134 INDEX public idx_pedido_usuario postgres
+4778; 1259 41133 INDEX public idx_producto_categoria_vig postgres
+4791; 2606 41123 FK CONSTRAINT public detalle_pedido detalle_pedido_pedido_id_fkey postgres
+4792; 2606 41128 FK CONSTRAINT public detalle_pedido detalle_pedido_producto_id_fkey postgres
+4790; 2606 41109 FK CONSTRAINT public pedido pedido_usuario_id_fkey postgres
+4789; 2606 41088 FK CONSTRAINT public producto producto_id_categoria_fkey postgres
+
+EXITCODE=0 objetos listados: 33
+tablas TABLE en el TOC: 5
+TABLE public categoria: 1
+TABLE public producto: 1
+TABLE public usuario: 1
+TABLE public pedido: 1
+TABLE public detalle_pedido: 1
+
+============================================================
+D. RESUMEN PASS/FAIL POR PUNTO
+============================================================
+1. Entorno: PASS
+   pg_isready 5432 = accepting connections (exit 0); 5433 = no response (exit 2).
+   psql (PostgreSQL) 17.11; foodstore existe y conecta con -w (sin pedir contrasena).
+   Autenticacion resuelta con %APPDATA%\postgresql\pgpass.conf.
+2. Camino de error (-Port 5999): PASS
+   EXITCODE=1, RESULTADO=ERROR parcial=eliminado, 0 .dump, 0 .parcial, solo el log.
+3. Respaldo real (-Port 5432): PASS
+   EXITCODE=0, RESULTADO=OK, foodstore_20261028_2008.dump con fecha y hora,
+   0 .parcial, pg_restore -l lista 33 objetos y las 5 tablas.
+4. SHA-256: PASS
+   Get-FileHash = DA38B10B7C0F87D3EF3D018809543E80406B08A20EA702E3933B96C110BE096D
+   log          = DA38B10B7C0F87D3EF3D018809543E80406B08A20EA702E3933B96C110BE096D
+   Coinciden.
+Nota: el punto 3 requirio reconstruir foodstore (ver ANEXO).
+
+============================================================
+ANEXO. PREPARACION DEL ENTORNO (reconstruccion de foodstore)
+============================================================
+Contexto (no es salida de comando): al iniciar, foodstore tenia el esquema viejo
+de TPs anteriores (cliente / producto.precio / detalle_pedido.precio_unitario),
+5 tablas con 0 filas, 2 tipos enum (estado_pedido_t, forma_pago_t) y 5
+secuencias. No tenia la tabla usuario. Un primer intento de respaldo aborto por
+la guardia del script (19:55), lo que confirmo el problema:
+
+--- Primer intento de respaldo (2026-10-28 19:55) ---
+[2026-10-28 19:55:18] INFO  INICIO respaldo | servidor=localhost:5432 | usuario=postgres | base=foodstore | destino=C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_1955.dump | retencion=7
+[2026-10-28 19:55:18] INFO  Autenticacion: pgpass.conf (%APPDATA%\postgresql\pgpass.conf), sin contrasena en el script.
+[2026-10-28 19:55:18] INFO  Ejecutando: pg_dump -Fc --no-password --lock-wait-timeout=30s -h localhost -p 5432 -U postgres -d foodstore -f C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_195518.dump.parcial
+[2026-10-28 19:55:20] INFO  Dump escrito en .parcial: C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_195518.dump.parcial (0.01 MB)
+[2026-10-28 19:55:21] ERROR ERROR: El dump no contiene las tablas esperadas: usuario
+[2026-10-28 19:55:21] WARN  Se elimino el archivo parcial incompleto: C:\Users\facun\Desktop\TUP\3erSemestre\Base_de_Datos2\Tps_BasedeDatos\tp8-foodstore-mantenimiento\backups\foodstore_20261028_195518.dump.parcial
+[2026-10-28 19:55:21] ERROR RESULTADO=ERROR parcial=eliminado
+
+Se reconstruyo foodstore con sql/00_reconstruccion_foodstore.sql. Antes se
+borraron SOLO los objetos viejos, todos con 0 filas:
+
+--- DROP de tablas viejas ---
+DROP TABLE
+
+--- DROP de tipos enum viejos ---
+DROP TYPE
+
+--- Reconstruccion (salida de psql) ---
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+BEGIN
+ setseed 
+---------
+ 
+(1 row)
+
+INSERT 0 11
+INSERT 0 20000
+INSERT 0 50000
+INSERT 0 200000
+INSERT 0 400000
+UPDATE 200000
+COMMIT
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+
+--- Conteos y tamano posteriores a la reconstruccion ---
+categoria=11
+usuario=20000
+producto=50000
+pedido=200000
+detalle_pedido=400000
+tamano=102 MB / 107271859 bytes
+============================================================
