@@ -8,7 +8,7 @@ Cada integrante genera y firma su propia evidencia con el prefijo de su número:
 |---|---|
 | Matías (I1) | `i1_reconstruccion_<fecha>.txt`, `i1_informe_<fecha>.txt` |
 | Santi (I2) | `i2_backup_<fecha>.txt` (salida del script + `pg_restore -l` + listado de `backups/`) |
-| Facu Deseff (I3) | `i3_health_antes_<fecha>.txt`, `i3_health_con_muertas_<fecha>.txt`, `i3_maintenance_<fecha>.txt`, `i3_health_despues_<fecha>.txt` |
+| Facu Deseff (I3) | `i3_health_antes_<fecha>.txt`, `i3_churn_<fecha>.txt`, `i3_health_con_muertas_<fecha>.txt`, `i3_maintenance_<fecha>.txt`, `i3_health_despues_<fecha>.txt` |
 | Facu Ramirez (I4) | `i4_simulacro_<fecha>.txt`, `i4_prueba_negativa_<fecha>.txt` |
 
 `<fecha>` en formato `yyyyMMdd_HHmm`.

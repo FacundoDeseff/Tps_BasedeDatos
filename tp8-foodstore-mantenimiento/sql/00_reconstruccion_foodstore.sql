@@ -9,23 +9,52 @@
 -- Requisitos:
 --   * PostgreSQL 16+ (probado en PostgreSQL 17).
 --   * Base vacia llamada foodstore ya creada:
---       createdb -h localhost -p 5433 -U postgres foodstore
+--       createdb -h localhost -p 5432 -U postgres foodstore
 --   * Ejecutar con ON_ERROR_STOP:
---       psql -h localhost -p 5433 -U postgres -d foodstore -v ON_ERROR_STOP=1 -f 00_reconstruccion_foodstore.sql
+--       psql -h localhost -p 5432 -U postgres -d foodstore -v ON_ERROR_STOP=1 -f 00_reconstruccion_foodstore.sql
 --
 -- Nota: este script NO crea ni elimina la base. Solo reconstruye el
 -- esquema y los datos dentro de foodstore. La base real no se toca
 -- desde ningun script de restauracion (ver AGENTS.md).
+--
+-- SEGURIDAD (corregido en TP8-I3): este script NO es destructivo por
+-- defecto. Si encuentra el esquema TP8 ya creado, aborta con error y no
+-- borra nada, porque AGENTS.md y SPEC_U6.md prohiben operaciones
+-- destructivas sobre la base principal. Para reconstruir a proposito hay
+-- que pedirlo de forma explicita y consciente:
+--       psql ... -v ON_ERROR_STOP=1 -v reset=1 -f 00_reconstruccion_foodstore.sql
+-- Incluso en ese caso el DROP no usa CASCADE: si otro objeto del proyecto
+-- (vista, FK externa) depende de estas tablas, el borrado falla en vez de
+-- arrastrarlo silenciosamente.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- 1. Limpieza del esquema (idempotente)
+-- 1. Guardia de seguridad: solo se limpia si se pidio -v reset=1
 -- ---------------------------------------------------------------------
-DROP TABLE IF EXISTS detalle_pedido CASCADE;
-DROP TABLE IF EXISTS pedido CASCADE;
-DROP TABLE IF EXISTS producto CASCADE;
-DROP TABLE IF EXISTS categoria CASCADE;
-DROP TABLE IF EXISTS usuario CASCADE;
+\if :{?reset}
+\else
+  \set reset 0
+\endif
+
+SELECT CASE WHEN count(*) > 0 THEN 1 ELSE 0 END AS esquema_existente
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name IN ('categoria', 'producto', 'usuario', 'pedido', 'detalle_pedido')
+\gset
+
+\if :esquema_existente
+  \if :reset
+    -- Reset explicito solicitado por el operador. Sin CASCADE a proposito.
+    DROP TABLE IF EXISTS detalle_pedido, pedido, producto, categoria, usuario;
+  \else
+    DO $guardia$
+    BEGIN
+      RAISE EXCEPTION
+        'ABORTADO: el esquema TP8 ya existe en esta base. Este script no borra datos sin permiso explicito (AGENTS.md / SPEC_U6.md seccion 2). Si realmente queres reconstruir, volve a ejecutarlo agregando -v reset=1.';
+    END
+    $guardia$;
+  \endif
+\endif
 
 -- ---------------------------------------------------------------------
 -- 2. Esquema canonico (mismo que TP3 / TP5 del proyecto integrador)
@@ -77,7 +106,7 @@ CREATE INDEX idx_detalle_producto ON detalle_pedido (producto_id, subtotal) WHER
 -- ---------------------------------------------------------------------
 -- 3. Carga de datos (volumen canonico del TP3)
 --    20.000 usuarios / 50.000 productos / 200.000 pedidos
---    ~800.000 detalles de pedido.
+--    400.000 detalles de pedido (2 por pedido en promedio).
 --    setseed hace la carga reproducible entre ejecuciones.
 -- ---------------------------------------------------------------------
 BEGIN;
