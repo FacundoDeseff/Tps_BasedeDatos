@@ -15,3 +15,7 @@ La autenticación se debe resolver mediante el archivo de contraseñas de Postgr
 - NO utilizar \`VACUUM FULL\` como rutina diaria periódica, ya que genera un bloqueo exclusivo sobre las tablas. 
 Para mantenimiento rutinario se debe emplear \`VACUUM (ANALYZE)\` sobre las tablas operativas. 
 - Todo código generado por la IA debe ser probado manualmente en un entorno descartable antes de su programación automática.
+## Flujo de Trabajo en Equipo y Estado 
+- Antes de iniciar cualquier tarea, OpenCode DEBE leer el archivo \`STATE.md\` ubicado en la raíz de la carpeta del TP. 
+- \`STATE.md\` contiene qué integrante está trabajando, qué tareas fueron completadas y cuál es el siguiente paso pendiente. 
+- Al finalizar la generación de cada script, OpenCode debe actualizar \`STATE.md\` marcando la tarea actual como completada e indicando las instrucciones para el siguiente integrante.
