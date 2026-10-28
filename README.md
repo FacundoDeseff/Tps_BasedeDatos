@@ -10,3 +10,4 @@ Repositorio de trabajos prácticos de la materia.
 * **TP 4 - Analítica Food Store:** Consultas analíticas, optimización de queries y reporte PDF.
 * **TP 5 - Materialización Food Store:** Vistas materializadas y optimización de rendimiento.
 * **TP 6 - FNBC y Desnormalización Food Store:** Normalización a Forma Normal de Boyce-Codd (FNBC), vista materializada con índice y scripts de auditoría/conciliación de datos.
+* **TP 7 - Seguridad Food Store:** Roles y permisos de mínimo privilegio, auditoría nativa, simulacro de incidente reconstruido con IA y anonimización con verificación de equivalencia.

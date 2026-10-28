@@ -133,3 +133,22 @@ quién, qué, cuándo y desde dónde, y para detectar intentos denegados y fallo
 autenticación. No sirve para saber cuántos datos se tocaron ni qué valores
 cambiaron. Para el simulacro de la Parte C hay que anonimizar el log antes de
 mostrárselo a un asistente, porque contiene identificadores y texto de consultas.
+
+## 6. Paso de cierre: devolver la configuración
+
+Los cuatro parámetros se aplicaron con `ALTER SYSTEM`, así que valen para todo el
+clúster y quedan guardados en `postgresql.auto.conf` hasta que se los revierta.
+Si en la instancia donde se hizo la prueba siguen activos, hay que devolverlos a
+su valor previo desde una sesión de `postgres`:
+
+```sql
+ALTER SYSTEM RESET log_statement;
+ALTER SYSTEM RESET log_connections;
+ALTER SYSTEM RESET log_disconnections;
+ALTER SYSTEM RESET log_line_prefix;
+SELECT pg_reload_conf();
+```
+
+Es un paso operativo sobre la instancia, no un artefacto del trabajo: su salida
+no se conserva en el repositorio. Si se quiere dejar constancia, alcanza con
+anotar la fecha en `BITACORA.md`.

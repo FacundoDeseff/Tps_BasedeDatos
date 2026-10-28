@@ -50,12 +50,12 @@ se guarda en el repositorio.
 (1 row)
 
 --- C.1 paso 3: lectura masiva de usuario (debe fallar) ---
-psql:C:/Users/Facundo/Desktop/facultad/materias/Base de datos/Tps_BasedeDatos/tp7-foodstore-seguridad/sql/simulacro_incidente.sql:77: ERROR:  permiso denegado a la tabla usuario
-psql:C:/Users/Facundo/Desktop/facultad/materias/Base de datos/Tps_BasedeDatos/tp7-foodstore-seguridad/sql/simulacro_incidente.sql:78: ERROR:  permiso denegado a la tabla usuario
+psql:<repo>/tp7-foodstore-seguridad/sql/simulacro_incidente.sql:77: ERROR:  permiso denegado a la tabla usuario
+psql:<repo>/tp7-foodstore-seguridad/sql/simulacro_incidente.sql:78: ERROR:  permiso denegado a la tabla usuario
 --- C.1 paso 4: intento de escalamiento (debe fallar) ---
-psql:C:/Users/Facundo/Desktop/facultad/materias/Base de datos/Tps_BasedeDatos/tp7-foodstore-seguridad/sql/simulacro_incidente.sql:87: ERROR:  se ha denegado el permiso para otorgar el rol «admin_datos»
+psql:<repo>/tp7-foodstore-seguridad/sql/simulacro_incidente.sql:87: ERROR:  se ha denegado el permiso para otorgar el rol «admin_datos»
 DETAIL:  Sólo los roles con la opción ADMIN en el rol «admin_datos» pueden otorgar este rol.
-psql:C:/Users/Facundo/Desktop/facultad/materias/Base de datos/Tps_BasedeDatos/tp7-foodstore-seguridad/sql/simulacro_incidente.sql:88: ERROR:  se ha denegado el permiso para otorgar el rol «admin_datos»
+psql:<repo>/tp7-foodstore-seguridad/sql/simulacro_incidente.sql:88: ERROR:  se ha denegado el permiso para otorgar el rol «admin_datos»
 DETAIL:  Sólo los roles con la opción ADMIN en el rol «admin_datos» pueden otorgar este rol.
 === FIN_C ===
  marcador

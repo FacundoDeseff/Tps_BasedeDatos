@@ -170,19 +170,20 @@ Atributos: `CREATEDB`, `CREATEROLE`, `NOSUPERUSER`, `INHERIT`.
 
 ---
 
-## 5. Semántica asumida de vistas y materializada
+## 5. Definición de vistas y materializada
 
 > El enunciado solo describió `v_usuarios_seguros` y
-> `vm_facturacion_categoria_mes`. Las demás se asumen como sigue; confirmar
-> sus definiciones reales en la implementación.
+> `vm_facturacion_categoria_mes`. Las definiciones de la tabla siguiente se
+> verificaron contra `tp5-foodstore-materializacion/views.sql`, que es el script
+> que creó estos objetos en `copia_trabajo` y que se ejecutó antes de este TP.
 
-| Objeto | Definición asumida | PII | Acceso |
+| Objeto | Definición real | PII | Acceso |
 |---|---|---|---|
-| `v_productos_vigentes` | `producto` JOIN `categoria` WHERE `producto.eliminado = false` | No | lectura, reportes |
-| `v_detalle_pedido_producto` | `detalle_pedido` JOIN `producto` (líneas + datos de producto) | No (sin `usuario`) | soporte, reportes |
-| `v_pedidos_usuario` | `pedido` JOIN `usuario` (pedido + nombre/apellido del usuario) | **Sí** | soporte, admin |
-| `v_usuarios_seguros` | `id_usuario, nombre, apellido` WHERE `eliminado = false` | **Sí** (nombre/apellido) | soporte, admin |
-| `vm_facturacion_categoria_mes` | facturación agregada por categoría y mes | No | reportes (y `REFRESH` por admin) |
+| `v_productos_vigentes` | `producto` JOIN `categoria`, ambos con `eliminado = false` | No | lectura, reportes |
+| `v_detalle_pedido_producto` | `detalle_pedido` + `pedido` + `producto`, los tres con `eliminado = false`; expone `id_pedido`, `id_detalle`, `producto_id`, `cantidad`, `subtotal` | No (sin `usuario`) | soporte, reportes |
+| `v_pedidos_usuario` | `pedido` JOIN `usuario`: pedido + `id_usuario`, `usuario_nombre`, `usuario_apellido` | **Sí** | soporte, admin |
+| `v_usuarios_seguros` | `id_usuario, nombre, apellido` WHERE `u.eliminado = false` | **Sí** (nombre/apellido) | soporte, admin |
+| `vm_facturacion_categoria_mes` | agregado por categoría y mes (`total_pedidos`, `total_facturado`); índice único `(id_categoria, mes)` para `REFRESH ... CONCURRENTLY` | No | reportes (y `REFRESH` por admin) |
 
 Decisión: a la app (`rol_app_*`) y a `rol_reportes` se les niega toda vista con
 PII. A `rol_soporte` se le da `SELECT` sobre las vistas con PII porque su
@@ -195,7 +196,9 @@ función es atender incidencias de cuentas y pedidos, pero **no** sobre la tabla
 
 ### 6.1 `fn_autenticar(p_email text, p_password text)`
 
-- `SECURITY DEFINER`, dueño `postgres`, `search_path = public` (fijado).
+- `SECURITY DEFINER`, dueño `postgres`, `search_path = public, pg_temp` (fijado).
+  `pg_temp` va **al final**: así un objeto temporal creado por el llamador nunca
+  gana la resolución de nombres de `usuario`, `crypt` ni `gen_salt`.
 - Lee `usuario` (filtrando `eliminado = false`) por `email`; compara
   `crypt(p_password, password_hash) = password_hash`.
 - Éxito: `intentos_fallidos := 0`; devuelve el `rol` de aplicación (y datos
@@ -214,7 +217,7 @@ función es atender incidencias de cuentas y pedidos, pero **no** sobre la tabla
 
 ### 6.2 `fn_resetear_password(p_id_usuario bigint, p_nueva_password text)`
 
-- `SECURITY DEFINER`, dueño `postgres`, `search_path = public` (fijado).
+- `SECURITY DEFINER`, dueño `postgres`, `search_path = public, pg_temp` (fijado).
 - Calcula `password_hash := crypt(p_nueva_password, gen_salt('bf', 8))`,
   actualiza `password_hash` y `intentos_fallidos := 0` donde
   `id_usuario = p_id_usuario AND eliminado = false`.
@@ -366,7 +369,7 @@ FROM pg_roles WHERE rolname = 'app_web';
 | Nuevas tablas nacen sin default de acceso → grants manuales olvidados o excesivos | Medio | Sin default de tablas (§8); cada tabla nueva se otorga a mano conforme a la matriz y se revisa al alta. |
 | Default de secuencias y `REVOKE EXECUTE` afectan a objetos futuros del grantor | Medio | `REVOKE` puntual sobre secuencias/funciones sensibles; otorgar `EXECUTE` explícito a quien corresponda (§8.1). |
 | Múltiples propietarios crean tablas y no heredan defaults | Medio | Documentar el `grantor` de `ALTER DEFAULT PRIVILEGES`; cada creador debe aplicar su propia política. |
-| Inyección SQL en funciones `SECURITY DEFINER` | Alto | SQL parametrizado (`USING`), `search_path` fijado a `public`, sin concatenación de texto del usuario. |
+| Inyección SQL en funciones `SECURITY DEFINER` | Alto | SQL parametrizado (`USING`), `search_path` fijado a `public, pg_temp`, sin concatenación de texto del usuario. |
 | `app_web` hereda un privilegio peligroso si se modifica un grupo | Medio | Auditar grants de `rol_app_lectura`/`rol_app_escritura` ante cada cambio; la matriz es la referencia. |
 | `v_detalle_pedido_producto` expone líneas de **todos** los pedidos (sin PII) | Bajo/Medio | Aceptado para dev; si se requiere estricto, RLS o función parametrizada por `pedido_id`. |
 | `vm_facturacion_categoria_mes` desactualizada → reportes con datos stale | Bajo | `admin_datos` define la frecuencia de `REFRESH`; documentar la antigüedad máxima tolerada. |
@@ -378,25 +381,43 @@ FROM pg_roles WHERE rolname = 'app_web';
 
 ---
 
-## 12. Brecha con la implementación existente (`sql/roles.sql`)
+## 12. Estado final de la implementación (`sql/roles.sql`)
 
-El script actual **no** se ajusta a este spec (es previo a esta planificación).
-Diferencias a resolver en la fase de implementación:
+`sql/roles.sql` se regeneró conforme a este spec y se verificó contra la matriz:
+la salida de `sql/verificacion_roles.sql` está en `docs/verificacion_roles.txt` y
+las pruebas funcionales de los seis roles en `docs/pruebas_funcionales_roles.txt`.
 
-- Apunta a **PostgreSQL 16+**, no a 17.
-- Maneja nombres genéricos (`cliente`, `linea_pedido`) que **no existen** en el
-  esquema real.
-- **No cubre** las vistas ni `vm_facturacion_categoria_mes`.
-- **No crea** `fn_resetear_password` ni las columnas nuevas de `usuario`.
-- Le da a `rol_soporte` `SELECT` sobre la tabla `usuario` completa (debería ser
-  `v_usuarios_seguros` + `SELECT(id_usuario)`/`UPDATE` por columna).
-- No documenta ni verifica el fallo de `GRANT admin_datos TO app_web`.
-- Otorga `SELECT`/`INSERT` por defecto sobre tablas (este spec los elimina y
-  deja solo secuencias + `REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`).
-- No contempla el `SELECT` a nivel de columna que `INSERT ... RETURNING`
-  exige sobre `id_pedido`/`id_detalle`.
+Diferencias que se resolvieron respecto de la versión previa del script:
 
-> No se modifica `roles.sql` en esta fase. Se regenerará conforme a este spec.
+- Apunta a **PostgreSQL 17** y usa el esquema real (`producto`, `pedido`,
+  `detalle_pedido`), no nombres genéricos.
+- Cubre las cuatro vistas y `vm_facturacion_categoria_mes`.
+- La creación de las columnas nuevas de `usuario` y de las dos funciones
+  `SECURITY DEFINER` quedó en `sql/00_reconstruccion_clase2.sql`, que se ejecuta
+  antes que `roles.sql`.
+- `rol_soporte` lee `v_usuarios_seguros` + `SELECT(id_usuario)` y actualiza por
+  columna; no tiene `SELECT` sobre la tabla `usuario`.
+- El fallo de `GRANT admin_datos TO app_web` está previsto y verificado (§9.1 y
+  §13.2).
+- Los `ALTER DEFAULT PRIVILEGES` quedaron limitados a secuencias y a
+  `REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC` (§8).
+- `INSERT ... RETURNING` tiene el `SELECT` por columna que necesita (§4.2).
+
+Desvíos deliberados respecto de este documento, ya registrados en la bitácora:
+
+- `admin_datos` recibe `SELECT` e `INSERT` **por columna** sobre `usuario`, sin
+  `password_hash`, y no a nivel de tabla: un `INSERT` general le permitiría
+  escribir un hash propio y saltear `fn_resetear_password`.
+- `REFRESH` de la vista materializada se otorga con `GRANT MAINTAIN` (PostgreSQL
+  17), no con un privilegio suelto de `REFRESH`.
+- `REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC` es global porque la sintaxis de
+  `ALTER DEFAULT PRIVILEGES` no admite `IN SCHEMA` para retirar un default de
+  `PUBLIC`; queda documentado en el propio script.
+- El umbral de bloqueo de `fn_autenticar` es de 5 intentos y devuelve
+  `cuenta_bloqueada`; es una decisión de diseño de la implementación.
+
+Los hallazgos de la auditoría posterior (H1 a H10) están en
+`docs/auditoria_roles_sql.md` §2 y §4, con su estado.
 
 ---
 

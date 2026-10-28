@@ -259,8 +259,8 @@ Criterios de aceptación:
 Criterios de aceptación:
 
 - EL SISTEMA DEBERÁ (re)construir `fn_autenticar(p_email text, p_password text)`
-  con `SECURITY DEFINER`, dueño `postgres`, y `search_path` fijado a `public`
-  (evitar inyección por `search_path`).
+  con `SECURITY DEFINER`, dueño `postgres`, y `search_path` fijado a
+  `public, pg_temp` (evitar inyección por `search_path`).
 - LA FUNCIÓN deberá comparar `crypt(p_password, password_hash) = password_hash`
   para el usuario no eliminado con ese `email`.
 - LA FUNCIÓN deberá incrementar `intentos_fallidos` ante un intento fallido y,

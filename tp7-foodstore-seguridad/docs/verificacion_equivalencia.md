@@ -47,6 +47,32 @@ equivalencia podría romperse al correr cada consulta en una sesión distinta.
 
 Comprobación automática con `FULL JOIN`: `coincide = t` en todos los grupos.
 
+La tabla de abajo se genera con esta consulta, que es el chequeo C del script sin
+el filtro de diferencias y con la columna `coincide`. Se deja acá para que el
+resultado sea reproducible:
+
+```sql
+WITH real AS (
+    SELECT u.rol,
+           (date_trunc('month', u.fecha_alta AT TIME ZONE 'UTC'))::date AS mes_alta,
+           count(*) AS cantidad
+    FROM public.usuario AS u
+    GROUP BY 1, 2
+), anon AS (
+    SELECT a.rol, a.mes_alta, count(*) AS cantidad
+    FROM public.usuario_anon AS a
+    GROUP BY 1, 2
+)
+SELECT COALESCE(r.rol, a.rol)           AS rol,
+       COALESCE(r.mes_alta, a.mes_alta) AS mes_alta,
+       r.cantidad                       AS real,
+       a.cantidad                       AS anon,
+       (r.cantidad IS NOT DISTINCT FROM a.cantidad) AS coincide
+FROM real AS r
+FULL JOIN anon AS a USING (rol, mes_alta)
+ORDER BY 1, 2;
+```
+
 ```text
    rol   |  mes_alta  | real | anon | coincide
 ---------+------------+------+------+----------
