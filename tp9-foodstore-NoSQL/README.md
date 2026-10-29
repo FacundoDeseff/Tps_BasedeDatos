@@ -18,6 +18,9 @@ Esta carpeta contiene el modelo documental, la extracción desde PostgreSQL y la
 | `02_extraccion_origen.sql` | Consultas para verificar en PostgreSQL los pedidos migrados y el control `total = suma de subtotales`. Incluye una vista previa del JSON. |
 | `03_migracion_pedidos.js` | Script de `mongosh` que crea la base/colección, define el validador `$jsonSchema`, crea índices e inserta 6 pedidos existentes con `insertMany()`. |
 | `04_reglas_integridad.md` | Las dos reglas de integridad de la Consigna 3 y la justificación de los datos embebidos. |
+| `consultas_mongodb.js` | Parte 2: consultas a, b, c y d de la Consigna 4 en `mongosh`. |
+| `consultas_postgresql.sql` | Parte 2: consultas equivalentes a b y c en PostgreSQL, acotadas a los pedidos migrados. |
+| `05_comparacion_resultados.md` | Parte 2: tabla comparativa de cantidades e IDs y explicación de diferencias. |
 
 ### Datos migrados
 
@@ -89,9 +92,6 @@ db.pedidos.countDocuments({ "items.id_producto": 5829 })
 - Las fechas de PostgreSQL son `timestamp without time zone` en `America/Buenos_Aires`. En MongoDB se guardan como `Date` con offset `-03:00`; los microsegundos se truncan a milisegundos.
 - Los importes son `numeric(12,2)` y se guardan como números. Para producción se recomienda `Decimal128`.
 
-### Próximos pasos (Partes 2 y 3)
+### Próximos pasos (Parte 3)
 
-- Crear `consultas_mongodb.js` con las consultas a, b, c y d de la Consigna 4.
-- Crear `consultas_postgresql.sql` con las consultas equivalentes a b y c.
-- Completar la tabla comparativa de cantidades e identificadores.
-- Redactar el contraste de afirmaciones de IA y la conclusión de la Parte 3.
+- Redactar el contraste de afirmaciones de IA y la conclusión.
