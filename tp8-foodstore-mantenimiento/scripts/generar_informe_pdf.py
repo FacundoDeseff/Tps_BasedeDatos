@@ -39,7 +39,7 @@ def build() -> None:
         textColor="#444444", spaceAfter=8,
     )
     body = ParagraphStyle(
-        "body", fontName="Helvetica", fontSize=8.7, leading=10.6,
+        "body", fontName="Helvetica", fontSize=10.6, leading=13.1,
         spaceAfter=4,
     )
     bullet = ParagraphStyle(
