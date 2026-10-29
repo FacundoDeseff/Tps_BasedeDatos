@@ -1,0 +1,155 @@
+================================================================
+A) PEDIDO COMPLETO EN UNA SOLA LECTURA (findOne)
+================================================================
+{
+  _id: 1,
+  id_pedido: 1,
+  estado: 'ENTREGADO',
+  total: 4606.71,
+  cliente: {
+    id_usuario: 2578,
+    nombre: 'Usuario_2578',
+    apellido: 'Apellido_2578'
+  },
+  lineas: 2,
+  items: [
+    {
+      id_detalle: 1,
+      id_producto: 5829,
+      nombre_producto: 'Producto_5829',
+      id_categoria: 7,
+      categoria: 'Pastas',
+      cantidad: 2,
+      precio_unitario_historico: 1580.345,
+      subtotal: 3160.69,
+      eliminado: false
+    },
+    {
+      id_detalle: 2,
+      id_producto: 32828,
+      nombre_producto: 'Producto_32828',
+      id_categoria: 7,
+      categoria: 'Pastas',
+      cantidad: 2,
+      precio_unitario_historico: 723.01,
+      subtotal: 1446.02,
+      eliminado: false
+    }
+  ]
+}
+Documentos devueltos por la lectura: 1
+Lineas incluidas en el documento: 2
+
+================================================================
+B) COHERENCIA ARITMETICA DE LOS 6 PEDIDOS MIGRADOS
+================================================================
+Pedidos revisados: 6
+Pedidos con total != suma de subtotales: 0
+Lineas con subtotal != cantidad * precio_unitario_historico: 0
+
+================================================================
+C) PRUEBA: el validador $jsonSchema ACEPTA un total incoherente
+   Documento con total=1.00 y una linea con subtotal=100.00
+================================================================
+insertOne -> acknowledged=true, insertedId=999
+Documento guardado: total=1, suma_subtotales=100
+RESULTADO: ACEPTADO. El validador no compara campos entre si.
+Limpieza: documentos eliminados=1
+
+================================================================
+D) PRUEBA: el validador RECHAZA un documento sin items
+================================================================
+RESULTADO: RECHAZADO (MongoServerError: Document failed validation)
+
+================================================================
+E) PRUEBA: indice unico RECHAZA un id_detalle duplicado entre pedidos
+   (id_detalle=1 ya existe en el pedido 1)
+================================================================
+RESULTADO: RECHAZADO (code=11000, MongoServerError: E11000 duplicate key error collection: foodstore_nosql.pedidos index: items.id_detalle_1 dup key: { items.id_detalle: 1 })
+
+================================================================
+F) INDICES DE LA COLECCION
+================================================================
+[
+  {
+    name: '_id_',
+    key: {
+      _id: 1
+    },
+    unique: false
+  },
+  {
+    name: 'id_pedido_1',
+    key: {
+      id_pedido: 1
+    },
+    unique: true
+  },
+  {
+    name: 'estado_1',
+    key: {
+      estado: 1
+    },
+    unique: false
+  },
+  {
+    name: 'cliente.id_usuario_1',
+    key: {
+      'cliente.id_usuario': 1
+    },
+    unique: false
+  },
+  {
+    name: 'items.id_producto_1',
+    key: {
+      'items.id_producto': 1
+    },
+    unique: false
+  },
+  {
+    name: 'items.id_detalle_1',
+    key: {
+      'items.id_detalle': 1
+    },
+    unique: true
+  },
+  {
+    name: 'total_1',
+    key: {
+      total: 1
+    },
+    unique: false
+  },
+  {
+    name: 'fecha_-1',
+    key: {
+      fecha: -1
+    },
+    unique: false
+  }
+]
+
+================================================================
+G) ESTADO FINAL: documentos en la coleccion
+================================================================
+countDocuments({}) = 6
+[
+  {
+    _id: 1
+  },
+  {
+    _id: 2
+  },
+  {
+    _id: 3
+  },
+  {
+    _id: 4
+  },
+  {
+    _id: 5
+  },
+  {
+    _id: 6
+  }
+]

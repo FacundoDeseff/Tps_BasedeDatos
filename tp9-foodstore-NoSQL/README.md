@@ -1,8 +1,8 @@
 # TP9 - Unidad 7: NoSQL y nuevas formas de almacenamiento
 
-## Food Store en MongoDB - Parte 1
+## Food Store en MongoDB
 
-Esta carpeta contiene el modelo documental, la extracción desde PostgreSQL y la migración de un subconjunto de pedidos de Food Store a MongoDB.
+Esta carpeta contiene las tres partes del TP9: modelo documental y migración (Parte 1), consultas y comparación con PostgreSQL (Parte 2) y evaluación de la tecnología con IA (Parte 3).
 
 ### Requisitos
 
@@ -21,6 +21,11 @@ Esta carpeta contiene el modelo documental, la extracción desde PostgreSQL y la
 | `consultas_mongodb.js` | Parte 2: consultas a, b, c y d de la Consigna 4 en `mongosh`. |
 | `consultas_postgresql.sql` | Parte 2: consultas equivalentes a b y c en PostgreSQL, acotadas a los pedidos migrados. |
 | `05_comparacion_resultados.md` | Parte 2: tabla comparativa de cantidades e IDs y explicación de diferencias. |
+| `06_contraste_ia_conclusion.md` | Parte 3: consulta a la IA, respuesta, contraste de dos afirmaciones y conclusión. |
+| `docs/p3_verificacion_mongodb.js` | Parte 3: script de verificación en `mongosh` (genera la evidencia). |
+| `docs/p3_verificacion_postgresql.sql` | Parte 3: script de verificación en PostgreSQL (usa `ROLLBACK`, no deja datos). |
+| `docs/p3_evidencia_mongodb.txt` | Salida real de la verificación en MongoDB. |
+| `docs/p3_evidencia_postgresql.txt` | Salida real de la verificación en PostgreSQL. |
 
 ### Datos migrados
 
@@ -92,6 +97,15 @@ db.pedidos.countDocuments({ "items.id_producto": 5829 })
 - Las fechas de PostgreSQL son `timestamp without time zone` en `America/Buenos_Aires`. En MongoDB se guardan como `Date` con offset `-03:00`; los microsegundos se truncan a milisegundos.
 - Los importes son `numeric(12,2)` y se guardan como números. Para producción se recomienda `Decimal128`.
 
-### Próximos pasos (Parte 3)
+### Parte 3 - Evaluación de la tecnología e IA
 
-- Redactar el contraste de afirmaciones de IA y la conclusión.
+La Parte 3 está en `06_contraste_ia_conclusion.md`. Incluye la consulta textual a la IA, la respuesta obtenida, el contraste de dos afirmaciones con documentación oficial y resultados del laboratorio, y la conclusión (167 palabras).
+
+Para reproducir la evidencia:
+
+```powershell
+mongosh "mongodb://localhost:27017/foodstore_nosql" --quiet --file docs/p3_verificacion_mongodb.js
+psql -h localhost -U postgres -d foodstore -f docs/p3_verificacion_postgresql.sql
+```
+
+La prueba de total incoherente en PostgreSQL corre dentro de `BEGIN/ROLLBACK`; las pruebas C, D y E fallan a propósito y no insertan filas.

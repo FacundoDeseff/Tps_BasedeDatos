@@ -1,0 +1,64 @@
+==============================================================
+A) RESTRICCIONES DECLARATIVAS DE pedido Y detalle_pedido
+==============================================================
+     tabla      |           restriccion           |                                  definicion                                   
+----------------+---------------------------------+-------------------------------------------------------------------------------
+ pedido         | pedido_usuario_id_fkey          | FOREIGN KEY (usuario_id) REFERENCES usuario(id_usuario) ON DELETE RESTRICT
+ pedido         | pedido_pkey                     | PRIMARY KEY (id_pedido)
+ detalle_pedido | detalle_pedido_cantidad_check   | CHECK ((cantidad > 0))
+ detalle_pedido | detalle_pedido_subtotal_check   | CHECK ((subtotal >= (0)::numeric))
+ detalle_pedido | detalle_pedido_pedido_id_fkey   | FOREIGN KEY (pedido_id) REFERENCES pedido(id_pedido) ON DELETE CASCADE
+ detalle_pedido | detalle_pedido_producto_id_fkey | FOREIGN KEY (producto_id) REFERENCES producto(id_producto) ON DELETE RESTRICT
+ detalle_pedido | detalle_pedido_pkey             | PRIMARY KEY (id_detalle)
+(7 rows)
+
+
+==============================================================
+B) PRUEBA: PostgreSQL ACEPTA un total incoherente con el detalle
+   pedido total=1.00 con una linea subtotal=100.00 (ROLLBACK)
+==============================================================
+BEGIN
+INSERT 0 1
+INSERT 0 1
+ id_pedido | total | suma_subtotales 
+-----------+-------+-----------------
+    999999 |  1.00 |          100.00
+(1 row)
+
+RESULTADO: la fila se inserto sin error; PostgreSQL no compara total con la suma de subtotales.
+ROLLBACK
+
+==============================================================
+C) PRUEBA: clave foranea RECHAZA un detalle huerfano
+==============================================================
+psql:C:/Users/Usuario/OneDrive/Desktop/global/Cosas Facultad/Base de Datos II/Tps_BasedeDatos/tp9-foodstore-NoSQL/docs/p3_verificacion_postgresql.sql:47: ERROR:  inserción o actualización en la tabla «detalle_pedido» viola la llave foránea «detalle_pedido_pedido_id_fkey»
+DETAIL:  La llave (pedido_id)=(999999998) no está presente en la tabla «pedido».
+RESULTADO: RECHAZADO por la clave foranea.
+
+==============================================================
+D) PRUEBA: CHECK RECHAZA cantidad = 0
+==============================================================
+psql:C:/Users/Usuario/OneDrive/Desktop/global/Cosas Facultad/Base de Datos II/Tps_BasedeDatos/tp9-foodstore-NoSQL/docs/p3_verificacion_postgresql.sql:55: ERROR:  el nuevo registro para la relación «detalle_pedido» viola la restricción «check» «detalle_pedido_cantidad_check»
+DETAIL:  La fila que falla contiene (400008, 1, 1, 0, 10.00, f).
+RESULTADO: RECHAZADO por el CHECK de cantidad.
+
+==============================================================
+E) PRUEBA: CHECK RECHAZA subtotal negativo
+==============================================================
+psql:C:/Users/Usuario/OneDrive/Desktop/global/Cosas Facultad/Base de Datos II/Tps_BasedeDatos/tp9-foodstore-NoSQL/docs/p3_verificacion_postgresql.sql:63: ERROR:  el nuevo registro para la relación «detalle_pedido» viola la restricción «check» «detalle_pedido_subtotal_check»
+DETAIL:  La fila que falla contiene (400009, 1, 1, 1, -10.00, f).
+RESULTADO: RECHAZADO por el CHECK de subtotal.
+
+==============================================================
+F) ESTADO FINAL: no quedaron filas de prueba
+==============================================================
+ pedidos_999999 
+----------------
+              0
+(1 row)
+
+ detalles_999999 
+-----------------
+               0
+(1 row)
+

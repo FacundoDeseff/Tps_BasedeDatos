@@ -12,3 +12,4 @@ Repositorio de trabajos prácticos de la materia.
 * **TP 6 - FNBC y Desnormalización Food Store:** Normalización a Forma Normal de Boyce-Codd (FNBC), vista materializada con índice y scripts de auditoría/conciliación de datos.
 * **TP 7 - Seguridad Food Store:** Roles y permisos de mínimo privilegio, auditoría nativa, simulacro de incidente reconstruido con IA y anonimización con verificación de equivalencia.
 * **TP 8 - Mantenimiento Food Store:** Plan de mantenimiento, respaldo diario en formato custom, monitoreo de salud, mantenimiento con `VACUUM (ANALYZE)`/`ANALYZE` y simulacro de restauración con RTO/RPO (en curso, trabajo grupal de 4 integrantes).
+* **TP 9 - NoSQL Food Store:** Modelo documental en MongoDB, migración de pedidos, consultas comparativas con PostgreSQL y evaluación crítica del uso de IA.
