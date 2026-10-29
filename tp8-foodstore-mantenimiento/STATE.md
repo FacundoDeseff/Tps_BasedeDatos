@@ -33,7 +33,7 @@
 
 - **Entregables:** `AGENTS.md`, `SPEC_U6.md`, `STATE.md`, `sql/00_reconstruccion_foodstore.sql`, `docs/i1_reconstruccion_*.txt`, plantilla de `informe_u6.md`.
 - **Hecho:** especificación con frecuencia y condición de finalización por tarea; base `foodstore` reconstruida y verificada (11 categorías, 20.000 usuarios, 50.000 productos, 200.000 pedidos, 400.000 detalles, 0 inválidos).
-- **Pendiente de Matías (Parte 5):** armar el `informe_u6.pdf` final con los números que entreguen Santi, Facu Deseff y Facu Ramirez.
+- **Parte 5 (cerrada):** `informe_u6.md` completo e `informe_u6.pdf` generado con los números de las cuatro partes (commit `acb6730`).
 - **Traspaso:** habilitado Santi.
 
 ---
