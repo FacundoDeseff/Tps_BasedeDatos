@@ -26,6 +26,11 @@ Esta carpeta contiene las tres partes del TP9: modelo documental y migración (P
 | `docs/p3_verificacion_postgresql.sql` | Parte 3: script de verificación en PostgreSQL (usa `ROLLBACK`, no deja datos). |
 | `docs/p3_evidencia_mongodb.txt` | Salida real de la verificación en MongoDB. |
 | `docs/p3_evidencia_postgresql.txt` | Salida real de la verificación en PostgreSQL. |
+| `informe_tp9.pdf` | Informe integrador de las tres partes, 5 páginas (formato de entrega). |
+| `informe_tp9.html` | Fuente imprimible del informe (A4). |
+| `scripts/generar_informe_pdf.py` | Exporta el HTML a PDF con Chrome o Edge en modo headless. |
+| `TP9_FoodStore_NoSQL_entrega.zip` | Paquete de entrega: informe, scripts de consultas, migración y evidencias. |
+| `LEEME_entrega.txt` | Detalle del contenido del paquete de entrega. |
 
 ### Datos migrados
 
@@ -81,6 +86,18 @@ db.pedidos.find({}, { _id: 1, estado: 1, total: 1 }).sort({ _id: 1 })
 db.pedidos.countDocuments({ estado: "ENTREGADO" })
 db.pedidos.countDocuments({ "items.id_producto": 5829 })
 ```
+
+### Informe
+
+El informe integrador está en `informe_tp9.pdf`: 5 páginas, dentro del máximo de la consigna, con modelo, evidencias de la colección y de las consultas, tabla de verificación, contraste de IA y conclusión. Se genera desde `informe_tp9.html`:
+
+```powershell
+python scripts/generar_informe_pdf.py
+```
+
+Requiere Chrome o Edge instalado. Si el navegador no está en una ruta estándar, se indica con la variable `CHROME_PATH`. Si `pymupdf` está instalado (`pip install pymupdf`), el script agrega el pie de página con la numeración; sin esa dependencia el PDF se genera igual, sin pie.
+
+Para la entrega se puede usar `TP9_FoodStore_NoSQL_entrega.zip`, que incluye `informe_tp9.pdf`, `consultas_mongodb.js`, `consultas_postgresql.sql`, `03_migracion_pedidos.js` y las evidencias de `docs/`.
 
 ### Decisiones principales
 

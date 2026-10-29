@@ -1,0 +1,18 @@
+TP9 - Unidad 7: Food Store en MongoDB
+Bases de Datos II
+
+Integrantes: Facundo Deseff, Santino Godoy, Facundo Ramírez y Matías Vargas
+Repositorio: https://github.com/FacundoDeseff/Tps_BasedeDatos
+Fecha: 29/10/2026
+
+Contenido de la entrega:
+- informe_tp9.pdf: informe integrador, 5 páginas.
+- consultas_mongodb.js: consultas a, b, c y d en mongosh.
+- consultas_postgresql.sql: consultas equivalentes b y c en PostgreSQL.
+- 03_migracion_pedidos.js: migración de los 6 pedidos a MongoDB.
+- docs/p3_evidencia_mongodb.txt: evidencia de las pruebas en MongoDB.
+- docs/p3_evidencia_postgresql.txt: evidencia de las pruebas en PostgreSQL.
+
+Para regenerar el PDF:
+  cd tp9-foodstore-NoSQL
+  python scripts/generar_informe_pdf.py

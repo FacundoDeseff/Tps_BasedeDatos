@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>TP9 - Food Store en MongoDB</title>
+<meta name="author" content="Facundo Deseff, Santino Godoy, Facundo Ramírez y Matías Vargas">
+<meta name="description" content="TP9 - Unidad 7 - Food Store en MongoDB">
+<style>
+  @page { size: A4; margin: 18mm 20mm 18mm 20mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10.3pt;
+    line-height: 1.36;
+    color: #000000;
+  }
+  .inst {
+    text-align: center;
+    font-size: 9.4pt;
+    margin: 0 0 1mm 0;
+  }
+  h1 {
+    font-size: 17pt;
+    text-align: center;
+    margin: 0 0 1.5mm 0;
+    line-height: 1.15;
+  }
+  .sub {
+    text-align: center;
+    font-size: 10.8pt;
+    margin: 0 0 2.5mm 0;
+  }
+  .meta {
+    text-align: center;
+    font-size: 9.2pt;
+    line-height: 1.35;
+    margin: 0 0 5mm 0;
+  }
+  h2 {
+    font-size: 12.4pt;
+    margin: 4.2mm 0 1.5mm 0;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 10.5pt;
+    margin: 2.8mm 0 1mm 0;
+    page-break-after: avoid;
+  }
+  p { margin: 0 0 1.8mm 0; text-align: justify; }
+  ul { margin: 0 0 1.8mm 0; padding-left: 4.5mm; }
+  li { margin-bottom: 0.6mm; text-align: justify; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.7pt;
+    line-height: 1.3;
+    margin: 1mm 0 2.2mm 0;
+  }
+  tr { page-break-inside: avoid; }
+  th, td {
+    border: 0.5pt solid #666666;
+    padding: 1mm 1.5mm;
+    vertical-align: top;
+  }
+  th {
+    background: #e8e8e8;
+    text-align: left;
+    font-weight: bold;
+  }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  .mono { font-family: Consolas, "Courier New", monospace; font-size: 8.2pt; }
+  code {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 8.6pt;
+  }
+  pre {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 7.9pt;
+    line-height: 1.3;
+    background: #f4f4f4;
+    border: 0.5pt solid #bbbbbb;
+    padding: 1.8mm 2.2mm;
+    margin: 1mm 0 2mm 0;
+    white-space: pre-wrap;
+    page-break-inside: avoid;
+  }
+  .note {
+    border-left: 2pt solid #999999;
+    padding-left: 2.5mm;
+    margin: 1.2mm 0 2mm 0;
+    font-size: 9.2pt;
+  }
+  .small { font-size: 8.8pt; }
+  .center { text-align: center; }
+</style>
+</head>
+<body>
+
+<p class="inst">Tecnicatura Universitaria en Programación</p>
+<h1>Trabajo Práctico N° 9: Food Store en MongoDB</h1>
+<p class="sub">Bases de Datos II - Unidad 7: NoSQL y nuevas formas de almacenamiento</p>
+<p class="meta">
+  Integrantes: Facundo Deseff, Santino Godoy, Facundo Ramírez y Matías Vargas<br>
+  Repositorio: github.com/FacundoDeseff/Tps_BasedeDatos<br>
+  Fecha: 29/10/2026
+</p>
+
+<h2>Introducción</h2>
+<p>En este trabajo pasamos una parte de la base de Food Store a MongoDB. Tomamos los pedidos con sus líneas y los datos básicos del cliente, ejecutamos cuatro consultas y las comparamos con PostgreSQL. También le pedimos a una IA que comparara los dos motores y después revisamos dos de sus afirmaciones con la documentación y con pruebas en el laboratorio.</p>
+
+<h2>1. Modelo en MongoDB</h2>
+
+<h3>1.1 Qué parte de la base tomamos</h3>
+<p>De la base relacional tomamos las tablas <code>pedido</code>, <code>detalle_pedido</code>, <code>usuario</code>, <code>producto</code> y <code>categoria</code>. La idea fue guardar el pedido completo en un solo documento, porque es lo que más se consulta en Food Store.</p>
+
+<table>
+  <thead>
+    <tr><th style="width:21%">Tabla</th><th style="width:17%">Clave primaria</th><th style="width:37%">Relación</th><th>Uso en MongoDB</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="mono">pedido</td><td class="mono">id_pedido</td><td class="mono">usuario_id → usuario.id_usuario</td><td>Documento principal</td></tr>
+    <tr><td class="mono">detalle_pedido</td><td class="mono">id_detalle</td><td class="mono">pedido_id → pedido; producto_id → producto</td><td>Líneas dentro de <code>items[]</code></td></tr>
+    <tr><td class="mono">usuario</td><td class="mono">id_usuario</td><td>—</td><td>Datos básicos en <code>cliente</code></td></tr>
+    <tr><td class="mono">producto / categoria</td><td class="mono">id_producto / id_categoria</td><td class="mono">producto.id_categoria → categoria</td><td>Referencia y nombre en cada línea</td></tr>
+  </tbody>
+</table>
+
+<h3>1.2 Cómo armamos el documento</h3>
+<p>Nos pareció que el pedido era la unidad natural. Las líneas van dentro de un arreglo <code>items[]</code> porque siempre se leen con la cabecera, son pocas y no tienen sentido sueltas. Así el pedido se lee de una sola vez y se inserta completo en una sola operación.</p>
+<ul>
+  <li><strong>Cliente:</strong> guardamos solo <code>id_usuario</code>, nombre y apellido. El resto del maestro queda afuera.</li>
+  <li><strong>Producto:</strong> guardamos <code>id_producto</code>, nombre, categoría y el precio que tenía en ese momento. No copiamos todo el catálogo porque el stock y el precio de lista cambian con el tiempo.</li>
+  <li><strong>Detalles:</strong> no hicimos una colección aparte. Sería lo mismo que la tabla relacional y nos obligaría a usar <code>$lookup</code> para armar un pedido.</li>
+</ul>
+<p>Lo que aceptamos es que el nombre del cliente y del producto queden repetidos en cada pedido. Nos parece bien porque así el pedido guarda lo que pasó en ese momento y no cambia si después se modifica el maestro.</p>
+
+<h3>1.3 Campos de la colección <code>foodstore_nosql.pedidos</code></h3>
+<table>
+  <thead>
+    <tr><th style="width:27%">Campo</th><th style="width:14%">Tipo</th><th>Qué guarda</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="mono">_id / id_pedido</td><td>int</td><td>El id original del pedido. Se guarda dos veces para no perder la referencia.</td></tr>
+    <tr><td class="mono">fecha</td><td>date</td><td>La fecha del pedido, en la zona horaria de Buenos Aires.</td></tr>
+    <tr><td class="mono">estado</td><td>string</td><td><code>PENDIENTE</code>, <code>EN_PREPARACION</code>, <code>ENTREGADO</code> o <code>CANCELADO</code>.</td></tr>
+    <tr><td class="mono">total</td><td>number</td><td>El total del pedido, copiado de <code>pedido.total</code>.</td></tr>
+    <tr><td class="mono">cliente</td><td>object</td><td><code>id_usuario</code>, nombre y apellido.</td></tr>
+    <tr><td class="mono">items[]</td><td>array</td><td><code>id_detalle</code>, <code>id_producto</code>, <code>nombre_producto</code>, <code>id_categoria</code>, <code>categoria</code>, <code>cantidad</code>, <code>precio_unitario_historico</code>, <code>subtotal</code> y <code>eliminado</code>.</td></tr>
+    <tr><td class="mono">lineas_count</td><td>int</td><td>Cuántas líneas tiene el pedido. Sirve para controlar.</td></tr>
+    <tr><td class="mono">moneda / origen</td><td>string / object</td><td><code>ARS</code> y los datos de dónde vino el documento.</td></tr>
+    <tr><td class="mono">migrado_en / schema_version</td><td>date / int</td><td>Cuándo se migró y qué versión del modelo se usó.</td></tr>
+  </tbody>
+</table>
+
+<h3>1.4 Ejemplo de un documento</h3>
+<p>Este es el pedido 1 tal como quedó en MongoDB:</p>
+<pre>{
+  "_id": 1, "id_pedido": 1, "fecha": ISODate("2026-09-29T13:30:21.757-03:00"),
+  "estado": "ENTREGADO", "total": 4606.71,
+  "cliente": { "id_usuario": 2578, "nombre": "Usuario_2578", "apellido": "Apellido_2578" },
+  "items": [
+    { "id_detalle": 1, "id_producto": 5829, "nombre_producto": "Producto_5829",
+      "id_categoria": 7, "categoria": "Pastas", "cantidad": 2,
+      "precio_unitario_historico": 1580.345, "subtotal": 3160.69, "eliminado": false },
+    { "id_detalle": 2, "id_producto": 32828, "nombre_producto": "Producto_32828",
+      "id_categoria": 7, "categoria": "Pastas", "cantidad": 2,
+      "precio_unitario_historico": 723.01, "subtotal": 1446.02, "eliminado": false }
+  ],
+  "lineas_count": 2, "moneda": "ARS",
+  "origen": { "sistema": "PostgreSQL", "base": "foodstore", "tabla": "pedido", "eliminado": false },
+  "migrado_en": ISODate("2026-10-29T12:00:00-03:00"), "schema_version": 1
+}</pre>
+
+<h3>1.5 Estado y precio histórico</h3>
+<p>El estado no existía en PostgreSQL: la tabla <code>pedido</code> solo tiene <code>eliminado</code>. Para no inventar datos, lo tradujimos así: <code>eliminado = true</code> pasa a <code>CANCELADO</code> y <code>eliminado = false</code> pasa a <code>ENTREGADO</code>. El valor original queda en <code>origen.eliminado</code>. Los estados <code>PENDIENTE</code> y <code>EN_PREPARACION</code> quedan disponibles para pedidos nuevos.</p>
+<p>El precio unitario tampoco estaba guardado. Lo calculamos como <code>subtotal / cantidad</code> y lo dejamos fijo en la línea. No usamos <code>producto.precio_lista</code> porque ese es el precio de hoy y no el de la venta.</p>
+
+<h2>2. Migración y reglas de integridad</h2>
+<p>Armamos la base <code>foodstore_nosql</code> y la colección <code>pedidos</code>. Le pusimos un validador <code>$jsonSchema</code> y creamos los índices. Pasamos 6 pedidos que ya existían en <code>foodstore</code> con un solo <code>insertMany()</code>: 5 <code>ENTREGADO</code> y 1 <code>CANCELADO</code> (el pedido 3, que tenía <code>eliminado = true</code>).</p>
+<p>Antes y después de insertar, el script revisa que los totales y las líneas estén bien. Si algo no cierra, corta la migración.</p>
+
+<pre>Documentos insertados: 6
+Integridad OK
+ENTREGADO: 5
+CANCELADO: 1
+
+Pedidos revisados: 6
+Pedidos con total != suma de subtotales: 0
+Líneas con subtotal != cantidad × precio: 0</pre>
+
+<p>Las dos reglas que nos pidieron conservar fueron estas:</p>
+<ul>
+  <li><strong>Regla 1, identificadores:</strong> <code>_id</code> e <code>id_pedido</code> guardan el <code>id_pedido</code> original; cada línea guarda <code>id_detalle</code> e <code>id_producto</code>; el cliente guarda <code>id_usuario</code>. Además, <code>items</code> no puede quedar vacío y hay índices únicos para <code>id_pedido</code> e <code>items.id_detalle</code>.</li>
+  <li><strong>Regla 2, importes:</strong> <code>total</code> tiene que ser igual a la suma de los <code>subtotal</code> y cada <code>subtotal</code> tiene que dar <code>cantidad × precio_unitario_historico</code>. Eso lo controla el script porque <code>$jsonSchema</code> no puede comparar dos campos entre sí.</li>
+</ul>
+<p>Los índices que creamos son: <code>_id</code>, <code>id_pedido</code> (único), <code>estado</code>, <code>cliente.id_usuario</code>, <code>items.id_producto</code>, <code>items.id_detalle</code> (único), <code>total</code> y <code>fecha</code> (descendente). Los usan las consultas de la parte 2.</p>
+
+<h2>3. Consultas en MongoDB</h2>
+<p>Ejecutamos estas cuatro consultas en <code>mongosh</code>:</p>
+<table>
+  <thead>
+    <tr><th style="width:5%">#</th><th style="width:43%">Consulta</th><th class="num" style="width:11%">Cantidad</th><th>IDs</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>a</td><td>Todos los pedidos, mostrando <code>_id</code> y <code>estado</code></td><td class="num">6</td><td>1, 2, 3, 4, 5, 6</td></tr>
+    <tr><td>b</td><td>Pedidos con <code>estado: "ENTREGADO"</code></td><td class="num">5</td><td>1, 2, 4, 5, 6</td></tr>
+    <tr><td>c</td><td>Pedidos que tienen el producto <code>5829</code> en <code>items[]</code></td><td class="num">1</td><td>1</td></tr>
+    <tr><td>d</td><td>Pedidos con <code>total &gt; 5000</code></td><td class="num">3</td><td>2, 4, 5</td></tr>
+  </tbody>
+</table>
+
+<pre>db.pedidos.find({}, { _id: 1, estado: 1 })
+db.pedidos.find({ estado: "ENTREGADO" })
+db.pedidos.find({ "items.id_producto": 5829 })
+db.pedidos.find({ total: { $gt: 5000 } })</pre>
+
+<p>El umbral de 5000 lo elegimos porque los totales van de 3283,34 a 7208,54 y el promedio es 4949,64. Con 5000 quedan 3 pedidos grandes (2, 4 y 5) y 3 chicos (1, 3 y 6).</p>
+<p>En la consulta c) usamos notación de punto porque hay una sola condición sobre el arreglo. Si tuviéramos que combinar dos condiciones de la misma línea, haría falta <code>$elemMatch</code>.</p>
+
+<h2>4. Comparación con PostgreSQL</h2>
+<p>Para comparar, hicimos las consultas b y c en PostgreSQL y las limitamos a los pedidos 1 a 6, que son los que pasamos a MongoDB. Si no las limitábamos, la comparación no tenía sentido porque <code>foodstore</code> tiene 200.000 pedidos.</p>
+<p>Como <code>pedido</code> no tiene estado, <code>ENTREGADO</code> lo buscamos con <code>eliminado = false</code>. Para el producto usamos <code>EXISTS</code>, así no se duplica el pedido si el producto aparece en dos líneas.</p>
+
+<table>
+  <thead>
+    <tr><th style="width:31%">Consulta</th><th class="num" style="width:20%">Cantidad en PostgreSQL</th><th class="num" style="width:20%">Cantidad en MongoDB</th><th class="num" style="width:16%">¿Coinciden los IDs?</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Estado <code>ENTREGADO</code></td><td class="num">5 (1, 2, 4, 5, 6)</td><td class="num">5 (1, 2, 4, 5, 6)</td><td class="num">Sí</td></tr>
+    <tr><td>Producto <code>5829</code></td><td class="num">1 (1)</td><td class="num">1 (1)</td><td class="num">Sí</td></tr>
+  </tbody>
+</table>
+
+<p>En los dos casos coincidieron la cantidad y los IDs. La diferencia más grande aparece si no limitamos el universo: PostgreSQL devuelve 194094 pedidos <code>ENTREGADO</code> y 3 pedidos con el producto 5829 (1, 33138 y 132374). Los últimos dos no los migramos, por eso no aparecen en MongoDB. No es un error del modelo, es que la colección tiene solo 6 pedidos.</p>
+<p>El pedido 3 queda afuera de <code>ENTREGADO</code> en los dos motores porque tiene <code>eliminado = true</code>. Las líneas eliminadas no las filtramos porque en el origen no hay ninguna con <code>eliminado = true</code>. No tuvimos que cambiar el modelo ni las consultas.</p>
+
+<h2>5. Uso de IA</h2>
+<p>Le pedimos a opencode, con el modelo <code>deepseek-v4.1-flash-free</code>, que comparara PostgreSQL y MongoDB para este caso. En la consulta le aclaramos el modelo actual, que el acceso más común es leer el pedido completo y que había que cuidar la coherencia de cantidades y precios.</p>
+
+<pre>Compará PostgreSQL y MongoDB para almacenar y consultar los pedidos de Food Store. El modelo
+actual es relacional: pedido, detalle_pedido, usuario, producto y categoria, con claves foráneas y
+tipos NUMERIC(12,2) para los importes. El acceso más frecuente es leer el pedido completo
+(cabecera, cliente y líneas). Se necesita conservar la coherencia de cantidades y precios:
+total = suma de subtotales, subtotal = cantidad × precio histórico y cantidad &gt; 0. Indicá ventajas y
+limitaciones de cada motor y si conviene mantener PostgreSQL, migrar ese subconjunto a MongoDB
+o combinar ambos.</pre>
+
+<p>La IA dijo, en resumen, que MongoDB tiene ventaja para leer el pedido completo porque no necesita <code>JOIN</code> ni <code>$lookup</code>, y que PostgreSQL da más garantías por las claves foráneas, los <code>CHECK</code> y las transacciones ACID. También dijo que MongoDB no puede garantizar <code>total = suma de subtotales</code>. Al final recomendó combinar los dos motores.</p>
+
+<h3>5.1 Contraste de dos afirmaciones</h3>
+<table>
+  <thead>
+    <tr><th style="width:28%">Afirmación de la IA</th><th style="width:50%">Qué revisamos</th><th style="width:22%">Resultado</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>“Al embeber las líneas en <code>items[]</code>, un pedido completo se recupera con una sola lectura, sin <code>JOIN</code> ni <code>$lookup</code>.”</td>
+      <td>La documentación de MongoDB recomienda embeber cuando los datos se consultan juntos. En <code>mongosh</code>, <code>findOne({ _id: 1 })</code> nos devolvió un documento con la cabecera, el cliente y las 2 líneas. La migración insertó los 6 pedidos con un solo <code>insertMany()</code>.</td>
+      <td>La parte de la lectura es cierta. No medimos velocidad, así que no podemos decir que sea más rápido.</td>
+    </tr>
+    <tr>
+      <td>“PostgreSQL garantiza <strong>mejor</strong> la coherencia de cantidades y precios porque es relacional […] MongoDB, en cambio, no puede garantizar que <code>total = suma de subtotales</code>.”</td>
+      <td><code>$jsonSchema</code> no compara campos entre sí. PostgreSQL tampoco puede hacer esa comparación con un <code>CHECK</code>, porque no puede mirar otras filas: necesita un trigger. En la prueba, los dos motores aceptaron un total de 1,00 con una línea de 100,00. Lo que sí funcionó fue la FK (rechazó un detalle huérfano) y los <code>CHECK</code> (rechazaron cantidad 0 y subtotal -10).</td>
+      <td>Es parcial. Es verdad que PostgreSQL controla mejor las referencias y los rangos, pero no garantiza la igualdad del total solo con restricciones. Los dos motores aceptaron el mismo error.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>5.2 Conclusión</h3>
+<p>Para nosotros, lo mejor es combinar los dos motores. PostgreSQL tiene que seguir siendo la base principal: ya tiene las 200.000 órdenes, controla las claves foráneas, los tipos <code>NUMERIC</code>, las cantidades positivas y las transacciones ACID. MongoDB nos sirve como una copia de lectura de los pedidos completos: al tener el cliente y los ítems en un mismo documento, se lee todo de una vez y queda guardado el precio y el nombre del momento de la compra. La igualdad <code>total = suma de subtotales</code> no la garantiza ninguno de los dos solo con validaciones: hay que controlarla en la migración, en la aplicación o con un trigger. Pasar todo a MongoDB nos haría perder controles y tener que rehacerlos; quedarnos solo con PostgreSQL nos hace perder la lectura armada. Por eso proponemos PostgreSQL como sistema de registro y MongoDB como copia de lectura que se sincroniza y se verifica. Antes de ampliar el subconjunto habría que medir latencias y volúmenes reales.</p>
+
+<h2 style="page-break-before: always">6. Evidencias</h2>
+<p>Estos son los 6 pedidos que migramos:</p>
+<table>
+  <thead>
+    <tr><th style="width:12%">id_pedido</th><th style="width:28%">Cliente</th><th style="width:20%">Estado</th><th class="num" style="width:14%">Total</th><th>En PostgreSQL</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td class="mono">Usuario_2578</td><td>ENTREGADO</td><td class="num">4606,71</td><td><code>eliminado = false</code></td></tr>
+    <tr><td>2</td><td class="mono">Usuario_7439</td><td>ENTREGADO</td><td class="num">7208,54</td><td><code>eliminado = false</code></td></tr>
+    <tr><td>3</td><td class="mono">Usuario_3430</td><td>CANCELADO</td><td class="num">3885,17</td><td><code>eliminado = true</code></td></tr>
+    <tr><td>4</td><td class="mono">Usuario_352</td><td>ENTREGADO</td><td class="num">5515,37</td><td><code>eliminado = false</code></td></tr>
+    <tr><td>5</td><td class="mono">Usuario_7773</td><td>ENTREGADO</td><td class="num">5198,69</td><td><code>eliminado = false</code></td></tr>
+    <tr><td>6</td><td class="mono">Usuario_6009</td><td>ENTREGADO</td><td class="num">3283,34</td><td><code>eliminado = false</code></td></tr>
+  </tbody>
+</table>
+
+<h3>6.1 Salidas de las consultas</h3>
+<pre>MongoDB
+a) cantidad = 6  ids = [1, 2, 3, 4, 5, 6]
+b) ENTREGADO  cantidad = 5  ids = [1, 2, 4, 5, 6]
+c) producto 5829  cantidad = 1  ids = [1]
+d) total &gt; 5000  cantidad = 3  ids = [2, 4, 5]
+
+PostgreSQL (acotado a los pedidos 1 a 6)
+b) ENTREGADO  cantidad = 5  ids = {1, 2, 4, 5, 6}
+c) producto 5829  cantidad = 1  ids = {1}
+
+PostgreSQL sin acotar
+ENTREGADO = 194094
+producto 5829 = 3 (1, 33138, 132374)</pre>
+
+<h3>6.2 Pruebas de integridad</h3>
+<table>
+  <thead>
+    <tr><th style="width:46%">Prueba</th><th style="width:27%">MongoDB</th><th>PostgreSQL</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>total = 1,00</code> con una línea de <code>subtotal = 100,00</code></td><td>Aceptado</td><td>Aceptado (con <code>ROLLBACK</code>)</td></tr>
+    <tr><td>Documento sin <code>items</code></td><td>Rechazado por <code>$jsonSchema</code></td><td>No aplica</td></tr>
+    <tr><td><code>id_detalle</code> duplicado</td><td>Rechazado (E11000, índice único)</td><td>No aplica</td></tr>
+    <tr><td>Detalle con <code>pedido_id</code> inexistente</td><td>No aplica</td><td>Rechazado por FK</td></tr>
+    <tr><td><code>cantidad = 0</code></td><td>No lo probamos</td><td>Rechazado por <code>CHECK</code></td></tr>
+    <tr><td><code>subtotal = -10,00</code></td><td>No lo probamos</td><td>Rechazado por <code>CHECK</code></td></tr>
+  </tbody>
+</table>
+
+<p class="note">MongoDB controla la estructura, los tipos y la unicidad, pero no la igualdad entre campos ni que las claves referenciadas existan. PostgreSQL controla las referencias, los tipos y los rangos con FK y <code>CHECK</code>, y permite atomicidad con ACID, pero tampoco compara <code>total</code> con la suma de subtotales sin un trigger. Los dos motores aceptaron el mismo documento incoherente.</p>
+
+<p class="small">Las pruebas completas están en <code>docs/p3_evidencia_mongodb.txt</code> y <code>docs/p3_evidencia_postgresql.txt</code>. Los resultados de las consultas están en <code>05_comparacion_resultados.md</code>. Los scripts adjuntos son <code>consultas_mongodb.js</code>, <code>consultas_postgresql.sql</code> y <code>03_migracion_pedidos.js</code>.</p>
+
+</body>
+</html>
