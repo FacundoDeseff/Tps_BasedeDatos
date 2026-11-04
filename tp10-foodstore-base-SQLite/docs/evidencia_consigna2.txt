@@ -1,0 +1,88 @@
+==============================================================================
+EVIDENCIA CONSIGNA 2 - TP10 Food Store (SQLite)
+Ejecución: 2026-11-04 12:59:41
+PostgreSQL de pruebas (copia): foodstore_u8 en localhost:5433
+SQLite: 3.50.4 | archivo: movil/foodstore_movil.db
+==============================================================================
+[PostgreSQL] vista v_snapshot_movil creada/actualizada (movil/servidor_snapshot.sql)
+[instantánea base] movil/servidor_snapshot.csv | filas=8 | fecha_copia=2026-11-04 12:59:41.478564-03
+[copia PostgreSQL] {'pedidos': 200000, 'stock': 4998378, 'feria': 8}
+[original PostgreSQL] {'pedidos': 200000, 'stock': 4998378, 'feria': 8} (no se toca)
+
+==============================================================================
+CASO C2 - Un borrador; después sube el precio en el servidor
+==============================================================================
+[SQLite] borrador c2c2c2c2-0000-4000-8000-000000000002 con producto 1 x2 a 125945 centavos
+INSERT INTO pedido_borrador (id_local, usuario, forma_pago) VALUES ('c2c2c2c2-0000-4000-8000-000000000002', 'cliente_c2', 'EFECTIVO');
+INSERT INTO item_borrador (id_local, producto_id, cantidad, precio_centavos_visto) VALUES ('c2c2c2c2-0000-4000-8000-000000000002', 1, 2, 125945);
+INSERT INTO cola_sync (solicitud_uuid, id_local) VALUES ('a2a2a2a2-0001-4000-8000-000000000021', 'c2c2c2c2-0000-4000-8000-000000000002');
+[PostgreSQL] UPDATE producto SET precio_lista = precio_lista + 100.00 WHERE id_producto = 1;
+[instantánea] movil/casos/snapshot_C2.csv | fecha_copia = 2026-11-04 12:59:42.014502-03
+[resultado] CONFLICTO | producto 1: 125945 -> 135945
+[cliente acepta] actualiza el precio del borrador y crea una solicitud nueva
+[resultado] SIMULADO_APROBADO | todo coincide con la instantánea
+[solicitud vieja] CONFLICTO (queda para revisión, no se reevalúa)
+[invariante] pedidos=200000 sin cambios | stock_total=4998378 sin cambios | productos_feria=8
+
+==============================================================================
+CASO C3 - Un borrador por más unidades de las que quedan
+==============================================================================
+[instantánea] movil/casos/snapshot_C3.csv | fecha_copia = 2026-11-04 12:59:42.436437-03
+[stock del servidor] producto 3 = 142; el borrador pide 192
+INSERT INTO pedido_borrador (id_local, usuario, forma_pago) VALUES ('c3c3c3c3-0000-4000-8000-000000000003', 'cliente_c3', 'TARJETA');
+INSERT INTO item_borrador (id_local, producto_id, cantidad, precio_centavos_visto) VALUES ('c3c3c3c3-0000-4000-8000-000000000003', 3, 192, 391303);
+INSERT INTO cola_sync (solicitud_uuid, id_local) VALUES ('a3a3a3a3-0000-4000-8000-000000000003', 'c3c3c3c3-0000-4000-8000-000000000003');
+[resultado] RECHAZADO | producto 3: stock 142 < 192
+[invariante] pedidos=200000 sin cambios | stock_total=4998378 sin cambios | productos_feria=8
+
+==============================================================================
+CASO C4 - Un borrador con un producto que después se da de baja
+==============================================================================
+INSERT INTO pedido_borrador (id_local, usuario, forma_pago) VALUES ('c4c4c4c4-0000-4000-8000-000000000004', 'cliente_c4', 'TRANSFERENCIA');
+INSERT INTO item_borrador (id_local, producto_id, cantidad, precio_centavos_visto) VALUES ('c4c4c4c4-0000-4000-8000-000000000004', 4, 1, 362912);
+INSERT INTO cola_sync (solicitud_uuid, id_local) VALUES ('a4a4a4a4-0000-4000-8000-000000000004', 'c4c4c4c4-0000-4000-8000-000000000004');
+[PostgreSQL] UPDATE producto SET eliminado = true WHERE id_producto = 4;
+[instantánea] movil/casos/snapshot_C4.csv | fecha_copia = 2026-11-04 12:59:42.887841-03
+[resultado] RECHAZADO | producto 4 dado de baja
+[catálogo recargado] ids disponibles = [1, 3, 5, 6, 7, 8, 10]
+[lápida] producto_cache id=4 eliminado=1
+[invariante] pedidos=200000 sin cambios | stock_total=4998378 sin cambios | productos_feria=8
+
+==============================================================================
+CASO C5 - Un borrador sin cambios
+==============================================================================
+[instantánea] movil/casos/snapshot_C5.csv | fecha_copia = 2026-11-04 12:59:43.353461-03
+INSERT INTO pedido_borrador (id_local, usuario, forma_pago) VALUES ('c5c5c5c5-0000-4000-8000-000000000005', 'cliente_c5', 'EFECTIVO');
+INSERT INTO item_borrador (id_local, producto_id, cantidad, precio_centavos_visto) VALUES ('c5c5c5c5-0000-4000-8000-000000000005', 5, 1, 58450);
+INSERT INTO cola_sync (solicitud_uuid, id_local) VALUES ('a5a5a5a5-0000-4000-8000-000000000005', 'c5c5c5c5-0000-4000-8000-000000000005');
+[resultado] SIMULADO_APROBADO | todo coincide con la instantánea
+[repetir semáforo] SIMULADO_APROBADO | todo coincide con la instantánea | solicitudes = 1
+[invariante] pedidos=200000 sin cambios | stock_total=4998378 sin cambios | productos_feria=8
+
+==============================================================================
+CASO C6 - Reenviar la misma solicitud (mismo UUID)
+==============================================================================
+[instantánea] movil/casos/snapshot_C6.csv | fecha_copia = 2026-11-04 12:59:43.854367-03
+INSERT INTO pedido_borrador (id_local, usuario, forma_pago) VALUES ('c6c6c6c6-0000-4000-8000-000000000006', 'cliente_c6', 'EFECTIVO');
+INSERT INTO item_borrador (id_local, producto_id, cantidad, precio_centavos_visto) VALUES ('c6c6c6c6-0000-4000-8000-000000000006', 6, 1, 251407);
+INSERT INTO cola_sync (solicitud_uuid, id_local) VALUES ('a6a6a6a6-0000-4000-8000-000000000006', 'c6c6c6c6-0000-4000-8000-000000000006');
+[primer envío] SIMULADO_APROBADO | todo coincide con la instantánea
+[reenvío mismo UUID] error esperado: UNIQUE constraint failed: cola_sync.solicitud_uuid
+[cola] antes=1 despues=1 (no se duplica)
+[repetir simulación] SIMULADO_APROBADO | todo coincide con la instantánea | solicitudes = 1
+[defensa real] En un sistema de verdad la protección va en el SERVIDOR: recibe solicitud_uuid como clave de idempotencia, la registra en una tabla de solicitudes procesadas (o usa una restricción UNIQUE) dentro de la misma transacción que crea el pedido, y si el UUID ya existe responde OK sin volver a vender.
+[invariante] pedidos=200000 sin cambios | stock_total=4998378 sin cambios | productos_feria=8
+
+==============================================================================
+RESUMEN
+==============================================================================
+C2 OK: precio cambiado -> CONFLICTO; precio aceptado -> SIMULADO_APROBADO
+C3 OK: más unidades que el stock -> RECHAZADO
+C4 OK: producto dado de baja -> RECHAZADO; lápida en producto_cache
+C5 OK: sin cambios -> SIMULADO_APROBADO
+C6 OK: UUID repetido -> error de clave primaria; no se duplica
+
+[verificación final en PostgreSQL]
+  copia foodstore_u8: {'pedidos': 200000, 'stock': 4998378, 'feria': 8}
+  original foodstore: {'pedidos': 200000, 'stock': 4998378, 'feria': 8}
+  Los pedidos y el stock no cambiaron por la simulación.
