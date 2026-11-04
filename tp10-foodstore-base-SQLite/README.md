@@ -72,8 +72,12 @@ SELECT solicitud_uuid, estado, motivo FROM cola_sync;
 
 ### 3. Consignas 3 y 4
 
-Pendientes: mapa de los tres motores, plan de mantenimiento, code review con IA,
-spec de Kiro, bitácora, DUIA y ensayo de defensa.
+- **Consigna 3:** hecha. Mapa de los tres motores, plan de mantenimiento y code
+  review con IA. La evidencia está en `docs/evidencia_consigna3.txt` y
+  `docs/verificaciones_consigna3.sql`.
+- **Consigna 4:** completada. Spec en Kiro (`movil/spec-kiro.md`), bitácora de uso
+  de IA (`docs/BITACORA.md`), DUIA (`docs/DUIA.md`), este README actualizado y
+  ensayo de defensa (`docs/ensayo_defensa.md`).
 
 ## Archivos
 
@@ -88,9 +92,15 @@ movil/
 ├── semaforo.sql               semáforo RECHAZADO / CONFLICTO / SIMULADO_APROBADO
 ├── simulador.py               ejecuta y documenta los casos C2 a C6
 ├── casos/                     instantáneas usadas en cada caso
+├── spec-kiro.md               spec requirements + design (consigna 4)
 └── foodstore_movil.db         base SQLite resultante
 
 docs/
-├── informe.md                 informe de la cursada
-└── evidencia_consigna2.txt    salida real de la simulación
+├── informe.md                 informe de la cursada (consignas 1-3)
+├── evidencia_consigna2.txt    salida real de la simulación (consigna 2)
+├── evidencia_consigna3.txt    salida de las comprobaciones (consigna 3)
+├── verificaciones_consigna3.sql consultas de verificación (consigna 3)
+├── BITACORA.md                bitácora de uso de IA (consigna 4)
+├── DUIA.md                    declaración de uso de IA (consigna 4)
+└── ensayo_defensa.md          ensayo de defensa oral (consigna 4)
 ```
