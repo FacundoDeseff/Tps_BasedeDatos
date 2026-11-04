@@ -36,3 +36,12 @@ ON CONFLICT (id) DO UPDATE SET
     disponible      = excluded.disponible,
     eliminado       = excluded.eliminado,
     fecha_copia     = excluded.fecha_copia;
+
+-- Si la instantánea nueva ya no trae un producto, la tablet no debe seguir
+-- ofreciéndolo. Se marca como no disponible, pero NO se toca 'eliminado':
+-- que un producto falte en la copia parcial no equivale a una baja lógica.
+-- Si vuelve a aparecer en una instantánea futura, el UPSERT lo reactiva.
+UPDATE producto_cache
+SET disponible = 0
+WHERE EXISTS (SELECT 1 FROM snapshot_servidor)
+  AND id NOT IN (SELECT id FROM snapshot_servidor);

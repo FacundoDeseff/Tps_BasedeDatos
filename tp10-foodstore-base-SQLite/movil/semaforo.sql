@@ -5,9 +5,9 @@
 --
 -- Reglas (solo se evalúan las solicitudes PENDIENTE):
 --   ROJO    -> RECHAZADO:
---              algún producto no existe en la instantánea, está dado de
---              baja (eliminado = 't'), no está disponible o no alcanza
---              el stock visto.
+--              el borrador no tiene ítems, o algún producto no existe en la
+--              instantánea, está dado de baja (eliminado = 't'), no está
+--              disponible o no alcanza el stock visto.
 --   AMARILLO -> CONFLICTO:
 --              no hay rojo, pero cambió al menos un precio.
 --   VERDE   -> SIMULADO_APROBADO:
@@ -24,6 +24,12 @@ PRAGMA foreign_keys = ON;
 
 UPDATE cola_sync
 SET estado = CASE
+        -- Un borrador sin ítems no es una venta válida: sin esta rama, los
+        -- dos conteos siguientes dan 0 y el CASE caía en SIMULADO_APROBADO.
+        WHEN NOT EXISTS (
+            SELECT 1 FROM item_borrador i WHERE i.id_local = cola_sync.id_local
+        ) THEN 'RECHAZADO'
+
         WHEN (
             SELECT COUNT(*)
             FROM item_borrador i
@@ -49,6 +55,11 @@ SET estado = CASE
     END,
 
     motivo = CASE
+        -- Motivo del rechazo: borrador vacío
+        WHEN NOT EXISTS (
+            SELECT 1 FROM item_borrador i WHERE i.id_local = cola_sync.id_local
+        ) THEN 'borrador sin ítems: no hay nada para sincronizar'
+
         -- Motivo del rechazo: detalle de cada ítem con problema
         WHEN (
             SELECT COUNT(*)

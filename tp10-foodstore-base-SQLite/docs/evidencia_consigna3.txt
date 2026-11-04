@@ -1,0 +1,275 @@
+==============================================================================
+EVIDENCIA CONSIGNA 3 - TP10 Food Store (SQLite)
+Ejecución: 2026-11-04 13:45:42
+PostgreSQL 17.11 en localhost:5432 (base foodstore) | SQLite 3.50.4
+==============================================================================
+
+Esta evidencia respalda el informe 3.a, 3.b y 3.c:
+  * la base de la tablet y el semáforo se ejecutan de verdad en SQLite;
+  * el code review se comprueba con consultas de solo lectura en PostgreSQL;
+  * los hallazgos F4 y F5 se muestran ANTES (git HEAD) y DESPUÉS (working tree).
+Ninguna consulta de este archivo modifica la base foodstore.
+
+==============================================================================
+1. SQLITE - BASE DE LA TABLET (1.c) Y SEMÁFORO (2.b / 2.c)
+==============================================================================
+
+[comando] python verify_sqlite.py --rev HEAD   (harness temporal; ejecuta los .sql del repo en SQLite)
+------------------------------------------------------------------------------
+[scripts] origen: git HEAD
+
+==========================================================================
+CONSIGNA 1.c - schema_sqlite.sql + pruebas_sqlite.sql ejecutados de verdad
+==========================================================================
+  tablas creadas: ['cola_sync', 'item_borrador', 'pedido_borrador', 'producto_cache']
+  STRICT: ['cola_sync', 'item_borrador', 'pedido_borrador', 'producto_cache']
+  PRAGMA foreign_keys = 1
+  -> ['prueba']
+     ('--- 1.c.1 TRANSACCION: COMMIT ---',)
+  -> ['momento', 'borradores', 'items', 'solicitudes']
+     ('tras COMMIT', 1, 2, 1)
+  -> ['prueba']
+     ('--- 1.c.1 TRANSACCION: ROLLBACK ---',)
+  -> ['momento', 'borradores']
+     ('dentro de la tx', 2)
+  -> ['momento', 'borradores', 'items', 'solicitudes']
+     ('tras ROLLBACK', 1, 2, 1)
+  -> ['prueba']
+     ('--- C1: catalogo disponible SIN servidor ---',)
+  -> ['id', 'nombre', 'precio_pesos', 'stock_visto']
+     (2, 'Empanada de carne', 1200.0, 50)
+     (1, 'Pizza muzzarella', 8500.0, 20)
+  -> ['prueba']
+     ('--- C7: datos invalidos -> error y sin filas nuevas ---',)
+  -> ['momento', 'items', 'borradores']
+     ('antes', 2, 1)
+  !! CHECK constraint failed: cantidad > 0
+  !! FOREIGN KEY constraint failed
+  -> ['momento', 'items', 'borradores']
+     ('despues', 2, 1)
+  !! CHECK constraint failed: forma_pago IN ('EFECTIVO', 'TARJETA', 'TRANSFERENCIA')
+  !! CHECK constraint failed: precio_centavos >= 0
+  !! CHECK constraint failed: disponible IN (0, 1)
+  !! CHECK constraint failed: estado IN ('PENDIENTE', 'CONFLICTO', 'RECHAZADO', 'SIMULADO_APROBADO')
+
+==========================================================================
+CONSIGNA 2.b - semaforo: verde, conflicto y rojo con la instantanea base
+==========================================================================
+   a5a5a5a5 ('SIMULADO_APROBADO', 'todo coincide con la instantánea')
+   a2a2a2a2 ('CONFLICTO', 'producto 1: 135945 -> 125945')
+   a3a3a3a3 ('RECHAZADO', 'producto 3: stock 142 < 192')
+  repetir semaforo (no debe reevaluar):
+   a5a5a5a5 ('SIMULADO_APROBADO', 'todo coincide con la instantánea')
+   a2a2a2a2 ('CONFLICTO', 'producto 1: 135945 -> 125945')
+   a3a3a3a3 ('RECHAZADO', 'producto 3: stock 142 < 192')
+
+==========================================================================
+CONSIGNA 2.c C4 - producto dado de baja en la instantanea nueva
+==========================================================================
+   estado: ('RECHAZADO', 'producto 4 dado de baja')
+   catalogo disponible: [(1,), (3,), (5,), (6,), (7,), (8,), (10,)]
+   lapida producto 4: (1,)
+   typeof(disponible) en producto_cache: ('integer', 'integer')
+
+==========================================================================
+HALLAZGO F4 - borrador sin items: que decide el semaforo actual
+==========================================================================
+   resultado: ('SIMULADO_APROBADO', 'todo coincide con la instantánea')
+
+==========================================================================
+HALLAZGO F5 - instantanea mas angosta deja filas viejas disponibles
+==========================================================================
+   cache inicial: [(1, 1, 0), (3, 1, 0), (4, 1, 0)]
+   cache tras instantanea solo id=1: [(1, 1, 0), (3, 1, 0), (4, 1, 0)]
+   solicitud de un producto que ya no viene: ('RECHAZADO', 'producto 3 inexistente')
+
+==========================================================================
+HALLAZGO F9 - UUID sin formato valido: el esquema lo acepta
+==========================================================================
+   aceptado: ('tampoco-uuid', 'no-es-un-uuid')
+
+==========================================================================
+FIN
+==========================================================================
+
+==============================================================================
+2. POSTGRESQL - COMPROBACIONES DEL CODE REVIEW
+==============================================================================
+
+[comando] "C:\Program Files\PostgreSQL\17\bin\psql.exe" -h localhost -p 5432 -U postgres -X -d foodstore -f docs\verificaciones_consigna3.sql
+------------------------------------------------------------------------------
+Pager usage is off.
+== CONSIGNA 2.a: SELECT de v_snapshot_movil sobre foodstore (8 filas) ==
+ vistas_creadas_en_la_base 
+---------------------------
+                         0
+(1 row)
+
+ id |   nombre    | precio_centavos | stock | disponible | eliminado | fecha_copia 
+----+-------------+-----------------+-------+------------+-----------+-------------
+  1 | Producto_1  |          125945 |   154 | t          | f         | 2026-11-04
+  3 | Producto_3  |          391303 |   144 | t          | f         | 2026-11-04
+  4 | Producto_4  |          362912 |    86 | t          | f         | 2026-11-04
+  5 | Producto_5  |           58450 |   115 | t          | f         | 2026-11-04
+  6 | Producto_6  |          251407 |   152 | t          | f         | 2026-11-04
+  7 | Producto_7  |          275660 |   165 | t          | f         | 2026-11-04
+  8 | Producto_8  |           63088 |   200 | t          | f         | 2026-11-04
+ 10 | Producto_10 |          327767 |   185 | t          | f         | 2026-11-04
+(8 rows)
+
+== F1: distribucion de productos por categoria ==
+ id_categoria | productos 
+--------------+-----------
+            7 |     50000
+(1 row)
+
+ categorias_distintas | productos_categoria_3 | total_productos 
+----------------------+-----------------------+-----------------
+                    1 |                     0 |           50000
+(1 row)
+
+== F2: pedido.fecha es timestamp, no date (TP6 usa fecha = CURRENT_DATE) ==
+ ultimo_dia_con_datos | pedidos_por_dia | pedidos_por_medianoche 
+----------------------+-----------------+------------------------
+ 2026-10-28           |             230 |                      0
+(1 row)
+
+       agrupacion        | filas  
+-------------------------+--------
+ agrupando por timestamp | 194094
+ agrupando por dia       |    368
+(2 rows)
+
+== F2b: la vista materializada del TP6 existe en la base? ==
+ matviewname 
+-------------
+(0 rows)
+
+== F3: facturacion historica con y sin filtro pr.eliminado ==
+ total_sin_filtro | total_solo_vigentes | total_productos_eliminados | pct_excluido 
+------------------+---------------------+----------------------------+--------------
+    1164994959.53 |       1073236662.31 |                91758297.22 |         7.88
+(1 row)
+
+ pedidos_con_productos_eliminados 
+----------------------------------
+                            29432
+(1 row)
+
+== F7: subtotal generado vs precio_lista del producto ==
+ detalles_totales | detalles_incoherentes 
+------------------+-----------------------
+           400000 |                399999
+(1 row)
+
+ id_detalle | cantidad | subtotal | precio_implicito | precio_lista 
+------------+----------+----------+------------------+--------------
+          1 |        2 |  3160.69 |          1580.35 |      3513.87
+(1 row)
+
+== F12: equivalencias del TP3 (0 = equivalentes) ==
+  comprobacion  | diferencias 
+----------------+-------------
+ comprobacion A |           0
+ comprobacion B |           0
+(2 rows)
+
+== F12b: categorias sin productos (COUNT(column) debe dar 0) ==
+ categorias_vacias 
+-------------------
+                10
+(1 row)
+
+==============================================================================
+3. SQLITE - DESPUÉS DE LAS CORRECCIONES (working tree)
+==============================================================================
+
+[comando] python verify_sqlite.py   (harness temporal; semaforo.sql y cargar_cache.sql corregidos)
+------------------------------------------------------------------------------
+[scripts] origen: working tree (corregidos)
+
+==========================================================================
+CONSIGNA 1.c - schema_sqlite.sql + pruebas_sqlite.sql ejecutados de verdad
+==========================================================================
+  tablas creadas: ['cola_sync', 'item_borrador', 'pedido_borrador', 'producto_cache']
+  STRICT: ['cola_sync', 'item_borrador', 'pedido_borrador', 'producto_cache']
+  PRAGMA foreign_keys = 1
+  -> ['prueba']
+     ('--- 1.c.1 TRANSACCION: COMMIT ---',)
+  -> ['momento', 'borradores', 'items', 'solicitudes']
+     ('tras COMMIT', 1, 2, 1)
+  -> ['prueba']
+     ('--- 1.c.1 TRANSACCION: ROLLBACK ---',)
+  -> ['momento', 'borradores']
+     ('dentro de la tx', 2)
+  -> ['momento', 'borradores', 'items', 'solicitudes']
+     ('tras ROLLBACK', 1, 2, 1)
+  -> ['prueba']
+     ('--- C1: catalogo disponible SIN servidor ---',)
+  -> ['id', 'nombre', 'precio_pesos', 'stock_visto']
+     (2, 'Empanada de carne', 1200.0, 50)
+     (1, 'Pizza muzzarella', 8500.0, 20)
+  -> ['prueba']
+     ('--- C7: datos invalidos -> error y sin filas nuevas ---',)
+  -> ['momento', 'items', 'borradores']
+     ('antes', 2, 1)
+  !! CHECK constraint failed: cantidad > 0
+  !! FOREIGN KEY constraint failed
+  -> ['momento', 'items', 'borradores']
+     ('despues', 2, 1)
+  !! CHECK constraint failed: forma_pago IN ('EFECTIVO', 'TARJETA', 'TRANSFERENCIA')
+  !! CHECK constraint failed: precio_centavos >= 0
+  !! CHECK constraint failed: disponible IN (0, 1)
+  !! CHECK constraint failed: estado IN ('PENDIENTE', 'CONFLICTO', 'RECHAZADO', 'SIMULADO_APROBADO')
+
+==========================================================================
+CONSIGNA 2.b - semaforo: verde, conflicto y rojo con la instantanea base
+==========================================================================
+   a5a5a5a5 ('SIMULADO_APROBADO', 'todo coincide con la instantánea')
+   a2a2a2a2 ('CONFLICTO', 'producto 1: 135945 -> 125945')
+   a3a3a3a3 ('RECHAZADO', 'producto 3: stock 142 < 192')
+  repetir semaforo (no debe reevaluar):
+   a5a5a5a5 ('SIMULADO_APROBADO', 'todo coincide con la instantánea')
+   a2a2a2a2 ('CONFLICTO', 'producto 1: 135945 -> 125945')
+   a3a3a3a3 ('RECHAZADO', 'producto 3: stock 142 < 192')
+
+==========================================================================
+CONSIGNA 2.c C4 - producto dado de baja en la instantanea nueva
+==========================================================================
+   estado: ('RECHAZADO', 'producto 4 dado de baja')
+   catalogo disponible: [(1,), (3,), (5,), (6,), (7,), (8,), (10,)]
+   lapida producto 4: (1,)
+   typeof(disponible) en producto_cache: ('integer', 'integer')
+
+==========================================================================
+HALLAZGO F4 - borrador sin items: que decide el semaforo actual
+==========================================================================
+   resultado: ('RECHAZADO', 'borrador sin ítems: no hay nada para sincronizar')
+
+==========================================================================
+HALLAZGO F5 - instantanea mas angosta deja filas viejas disponibles
+==========================================================================
+   cache inicial: [(1, 1, 0), (3, 1, 0), (4, 1, 0)]
+   cache tras instantanea solo id=1: [(1, 1, 0), (3, 0, 0), (4, 0, 0)]
+   solicitud de un producto que ya no viene: ('RECHAZADO', 'producto 3 inexistente')
+
+==========================================================================
+HALLAZGO F9 - UUID sin formato valido: el esquema lo acepta
+==========================================================================
+   aceptado: ('tampoco-uuid', 'no-es-un-uuid')
+
+==========================================================================
+FIN
+==========================================================================
+
+==============================================================================
+4. RESUMEN
+==============================================================================
+F1  TP3  categorías sintéticas: 50.000 productos en una sola categoría -> ACEPTADO
+F2  TP6  vista materializada 'diaria' agrupada por timestamp         -> ACEPTADO
+F3  TP4  facturación histórica filtra productos eliminados          -> ACEPTADO
+F7  TP3  subtotal generado no coincide con precio_lista              -> ACEPTADO (ya documentado en TP9)
+F4  TP10 borrador sin ítems salía SIMULADO_APROBADO                  -> CORREGIDO
+F5  TP10 instantánea más angosta dejaba productos viejos disponibles -> CORREGIDO
+F11 TP10 booleanos del CSV guardados como TEXT                       -> DESCARTADO
+F12 TP3  COUNT(p.id_producto) frente a COUNT(*)                     -> DESCARTADO

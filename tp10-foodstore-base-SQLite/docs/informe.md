@@ -5,9 +5,10 @@
 
 ## Estado del trabajo
 
-- **Consigna 1:** hecha. Están el esquema, las pruebas y la tabla de qué datos viajan.
-- **Consigna 2:** **hecha y probada**. Armamos la instantánea, el semáforo y los cinco casos (C2 a C6). Todos dieron lo que pedía la consigna y PostgreSQL no cambió. La salida completa está en `docs/evidencia_consigna2.txt`.
-- **Consignas 3 y 4:** pendientes.
+- **Consigna 1:** hecha. Están el esquema, las pruebas y la tabla de qué datos viajan. Se volvió a ejecutar `schema_sqlite.sql` + `pruebas_sqlite.sql` en una base temporal: las cuatro tablas son STRICT, las claves foráneas están activas y C1 y C7 dan lo esperado.
+- **Consigna 2:** **hecha y probada**. Armamos la instantánea, el semáforo y los cinco casos (C2 a C6). Todos dieron lo que pedía la consigna y PostgreSQL no cambió. La salida completa está en `docs/evidencia_consigna2.txt`. En la revisión de la consigna 3 se corrigieron dos casos borde del semáforo y de la carga del caché (F4 y F5, en 3.c).
+- **Consigna 3:** **hecha**. Mapa de los tres motores, plan de mantenimiento y code review con IA. La evidencia de las comprobaciones está en `docs/evidencia_consigna3.txt`.
+- **Consigna 4:** pendiente (spec en Kiro, bitácora, DUIA, README y ensayo de defensa).
 
 ## 1.a Qué datos viajan a la tablet
 
@@ -142,13 +143,65 @@ SELECT (SELECT count(*) FROM pedido)                          AS pedidos,
        (SELECT coalesce(sum(stock), 0) FROM producto)         AS stock_total;
 ```
 
-Nos dio lo mismo en los dos momentos:
+Nos dio lo mismo en los dos momentos (corrida del 2026-11-04, sobre la copia de ese momento):
 
 | Momento | Pedidos | Stock total |
 |---|---:|---:|
 | Antes de la simulación | 200000 | 4998378 |
 | Después de la simulación | 200000 | 4998378 |
 
-El resultado fue igual en la copia `foodstore_u8` y en la base original `foodstore`. La tablet nunca cambió el stock ni confirmó ventas. El cambio de precio de C2 y la baja de C4 los hicimos nosotros en la copia del servidor para preparar los casos, no los hizo el semáforo.
+La simulación no cambió ni los pedidos ni el stock total, ni en la copia `foodstore_u8` ni en la original `foodstore`: los totales dependen del estado de la base al momento de correrla, pero la comparación antes/después se mantiene. La tablet nunca cambió el stock ni confirmó ventas. El cambio de precio de C2 y la baja de C4 los hicimos nosotros en la copia del servidor para preparar los casos, no los hizo el semáforo.
 
 La salida completa, con los comandos y los resultados de cada caso, está en `docs/evidencia_consigna2.txt`.
+
+## 3. Integrar y revisar
+
+### 3.a Mapa de la capa de datos
+
+Cada motor tiene un papel distinto y un dueño distinto para cada dato. La regla de oro se mantiene: el móvil propone, el servidor dispone.
+
+| Dato | Motor que manda (fuente de verdad) | Copia o derivado | Quién escribe |
+|---|---|---|---|
+| Catálogo: nombre, `precio_lista`, `stock`, `eliminado` | PostgreSQL (`producto`, `categoria`) | `producto_cache` en SQLite (instantánea parcial); `items[].nombre_producto` y `items[].categoria` en MongoDB (snapshot histórico) | Solo PostgreSQL |
+| Clientes | PostgreSQL (`usuario`) | Snapshot `cliente` embebido en cada pedido de MongoDB; en SQLite no viaja (solo el alias `pedido_borrador.usuario`) | Solo PostgreSQL |
+| Ventas confirmadas | PostgreSQL (`pedido` + `detalle_pedido`) | Colección `foodstore_nosql.pedidos` en MongoDB (agregado de lectura) | Solo el servidor |
+| Borrador en curso | SQLite (`pedido_borrador`, `item_borrador`) | — | La tablet; es una propuesta |
+| Estado del envío | SQLite (`cola_sync`) en la simulación; en producción, tabla de solicitudes procesadas en PostgreSQL | — | La tablet encola; el servidor resuelve |
+| Precio histórico de una línea | PostgreSQL (`detalle_pedido.subtotal`) | MongoDB lo deriva y lo congela en `items[].precio_unitario_historico` y `items[].subtotal` | El servidor al cerrar la venta |
+
+- **PostgreSQL** es la fuente de verdad del negocio: catálogo, precio, stock y ventas. La tablet nunca cambia esos datos; el semáforo solo escribe en `cola_sync`.
+- **MongoDB (Unidad 7)** guarda el pedido como agregado documental (cabecera + cliente + `items[]`). Es una copia de lectura, derivada de PostgreSQL con `03_migracion_pedidos.js` (hoy migra 6 pedidos como fixture); no decide precio, stock ni ventas y se puede regenerar. Su valor es el snapshot histórico: conserva el nombre, la categoría y el precio implícito del momento de la compra.
+- **SQLite (tablet)** guarda lo mínimo para vender sin señal: catálogo parcial, borradores y cola de envío. Manda solo sobre el borrador (qué lleva, alias del cliente, forma de pago) y sobre el estado local del envío. `SIMULADO_APROBADO` no es una venta: es una propuesta que el servidor todavía tiene que validar.
+
+### 3.b Plan de mantenimiento (agregado al de la Unidad 6)
+
+**¿Qué se respalda y cómo se prueba la restauración?** Se respalda `foodstore` completo, una vez por día a las 03:00, con `pg_dump -Fc` y escritura en `.parcial` + renombre (TP8). El respaldo incluye la tabla de solicitudes procesadas que garantiza la idempotencia; sin ella, un reenvío después de restaurar podría duplicar una venta. Las tablets no se respaldan: `producto_cache` se reconstruye desde una instantánea y los borradores son descartables porque el servidor no confirmó nada. MongoDB tampoco es crítico: se puede regenerar desde PostgreSQL; si en producción pasara a ser dueño de algún dato, habría que agregar `mongodump` y su prueba de restauración. La restauración se prueba todas las semanas en `foodstore_restore_test` (nunca sobre `foodstore`) con `restore_test.ps1`: conteos contra el respaldo, CHECKs, claves foráneas huérfanas, `pedido.total = SUM(detalle_pedido.subtotal)` y secuencias al día, más una prueba negativa que debe fallar. Se registran RTO y RPO. Para cerrar la capa móvil, después de restaurar se vuelve a crear `v_snapshot_movil` y se repiten C3 y C5 en SQLite: el rojo y el verde tienen que dar lo mismo que antes.
+
+**Si se restaura un respaldo viejo de PostgreSQL, ¿qué hacen las tablets?** El servidor queda atrás y la tablet puede tener datos más nuevos. Al reconectar, el servidor no confía en el `SIMULADO_APROBADO` ni en los precios vistos: descarta la instantánea local, exige una copia completa y vuelve a evaluar cada solicitud pendiente contra el estado restaurado. Si el `solicitud_uuid` ya está en la tabla de procesadas del respaldo, responde OK sin volver a vender; si no está, la solicitud pudo haberse cobrado en la ventana perdida y va a revisión manual, no se aplica automáticamente. La `fecha_copia` de la tablet se compara con la marca del respaldo: si la tablet está adelantada, sus borradores pasan a CONFLICTO o RECHAZADO. La cola local no se borra hasta que el servidor confirme.
+
+**¿Cada cuánto y quién revisa CONFLICTO o RECHAZADO?** Al cierre de cada feria, el encargado del turno revisa la cola: en CONFLICTO acepta el precio nuevo o cancela con el cliente; en RECHAZADO avisa al cliente y arma el borrador de nuevo. Una vez por semana, el equipo de datos audita la cola completa y busca patrones (productos que siempre fallan, precios que cambian seguido, stock mal cargado). Cada decisión queda registrada con quién, cuándo y por qué.
+
+### 3.c Code review con IA
+
+Se pidió a OpenCode (modo plan, solo lectura) que revisara todos los scripts de la cursada (`tp1` a `tp10`), con la condición de que cada hallazgo fuera comprobable en la base. Cada uno se verificó ejecutando SQL de solo lectura sobre `foodstore` o sobre una base SQLite temporal; las consultas están en `docs/verificaciones_consigna3.sql` y la salida completa en `docs/evidencia_consigna3.txt`. Se descartaron los dos falsos positivos que se explican al final. Decisión: **aceptado** = hallazgo válido que se documenta como deuda; **corregido** = se cambió el código; **descartado** = falso positivo.
+
+| # | Hallazgo (archivo) | Decisión | Motivo |
+|---|---|---|---|
+| F1 · TP3 | `carga_masiva.sql:25-27`: el `LATERAL` no referencia la fila y los 50.000 productos quedaron en una sola categoría | Aceptado | Defecto real de los datos sintéticos; regenerar la carga invalidaría las mediciones y evidencias de TP3/TP5/TP6/TP8. Se documenta como limitación. |
+| F2 · TP6 | `tp_desnormalizacion_top_categorias.sql:22,29,44`: la vista "diaria" agrupa por `timestamp` y `fecha = CURRENT_DATE` solo matchea la medianoche | Aceptado | La definición correcta es `ped.fecha::date`. No se recrea la vista para no alterar la evidencia entregada del TP6. |
+| F3 · TP4 | `queries_tp4.sql:22,36`: la facturación histórica filtra `pr.eliminado = FALSE` y subestima las ventas | Aceptado | El reporte es histórico y TP5/TP6 no aplican ese filtro. Se documenta la inconsistencia; el filtro debería quitarse o informarse por separado. |
+| F7 · TP3 | `carga_masiva.sql:44`: el `subtotal` sintético no se calcula con `precio_lista` | Aceptado | Ya está documentado en TP9: el subtotal es el dato válido y el precio histórico se deriva de él. Es una característica de los datos, no un error del modelo. |
+| F4 · TP10 | `semaforo.sql:27-31`: un borrador sin ítems daba `SIMULADO_APROBADO` | Corregido | Se agregó la rama `NOT EXISTS (item_borrador)`: ahora da `RECHAZADO` con motivo "borrador sin ítems". |
+| F5 · TP10 | `cargar_cache.sql:44-47`: una instantánea más angosta dejaba productos viejos como disponibles | Corregido | Se agrega `UPDATE ... SET disponible = 0` para los ids que ya no vienen. No se toca `eliminado`: faltar en la copia no es una baja lógica. |
+| F11 · TP10 | `importar_snapshot.sql:23-24`: los booleanos del CSV se guardan como `TEXT` | Descartado | Es la tabla de staging del CSV de `psql` (`t`/`f`); `cargar_cache.sql` los pasa a 0/1 y `producto_cache` tiene `CHECK ... IN (0,1)`. |
+| F12 · TP3 | `equivalencias.sql:5,16`: `COUNT(p.id_producto)` parece un error frente a `COUNT(*)` | Descartado | Con `LEFT JOIN`, `COUNT(column)` es lo correcto: devuelve 0 en categorías vacías. Cambiarlo a `COUNT(*)` sería el bug. |
+
+**Cómo se comprobó cada hallazgo desarrollado**
+
+- **F1 (TP3).** En `foodstore`: `SELECT id_categoria, count(*) FROM producto GROUP BY 1` devuelve una sola fila, `7 | 50000`; `count(DISTINCT id_categoria) = 1` y `id_categoria = 3` tiene 0 productos. La categoría se eligió una vez y se reutilizó para las 50.000 filas.
+- **F2 (TP6).** Agrupando por `ped.fecha` salen 194.094 filas; por `ped.fecha::date`, 368. Para el último día con datos (2026-10-28) hay 230 pedidos por `::date` y 0 por igualdad directa con la fecha. El `WHERE fecha = CURRENT_DATE` compara un timestamp contra la medianoche.
+- **F3 (TP4).** La facturación histórica da 1.164.994.959,53 sin el filtro y 1.073.236.662,31 con el filtro: se excluyen 91.758.297,22 (7,88%). Hay 29.432 pedidos vigentes con productos eliminados.
+- **F7 (TP3).** De 400.000 detalles, 399.999 tienen `subtotal / cantidad` distinto de `precio_lista`; el ejemplo `id_detalle = 1` da 1.580,35 contra 3.513,87. TP9 ya documenta que el subtotal es el dato válido y el precio histórico se deriva de él.
+- **F4 (TP10).** En SQLite, un borrador sin ítems daba `SIMULADO_APROBADO` con motivo "todo coincide con la instantánea"; después del cambio da `RECHAZADO` con motivo "borrador sin ítems: no hay nada para sincronizar". C2 a C6 siguen dando lo mismo.
+- **F5 (TP10).** Al pasar de una instantánea con ids 1, 3 y 4 a otra con solo el id 1, antes las tres filas seguían con `disponible = 1`; ahora las ids 3 y 4 quedan en 0. El semáforo ya rechazaba la solicitud (`producto 3 inexistente`), así que el riesgo real era mostrar y dejar armar borradores con un producto que ya no viaja, no aprobar la venta. Esa parte del hallazgo de la IA se corrigió al verificarla.
+- **F11 y F12 (descartados).** F11: después de `cargar_cache.sql`, `typeof(disponible)` y `typeof(eliminado)` en `producto_cache` son `integer`; los `TEXT` viven solo en la tabla de staging que recibe el CSV. F12: las dos comprobaciones `EXCEPT` de `equivalencias.sql` devuelven 0 diferencias y las 10 categorías vacías se cuentan como 0, que es justo lo que se busca con `COUNT(column)`.
