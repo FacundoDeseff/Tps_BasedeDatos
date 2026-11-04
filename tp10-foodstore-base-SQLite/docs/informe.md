@@ -76,6 +76,19 @@ La consulta hace un `LEFT JOIN` de `item_borrador` con `snapshot_servidor` y usa
 
 Probamos todo con `python movil/simulador.py`. El simulador arma la base SQLite, importa la instantánea de cada caso y corre `semaforo.sql`. La salida completa está en `docs/evidencia_consigna2.txt`.
 
+En todos los casos el alta del borrador y la solicitud sigue el mismo patrón (cambian los valores):
+
+```sql
+INSERT INTO pedido_borrador (id_local, usuario, forma_pago)
+VALUES ('<uuid-borrador>', 'cliente_demo', 'EFECTIVO');
+
+INSERT INTO item_borrador (id_local, producto_id, cantidad, precio_centavos_visto)
+VALUES ('<uuid-borrador>', <producto>, <cantidad>, <precio>);
+
+INSERT INTO cola_sync (solicitud_uuid, id_local)
+VALUES ('<uuid-solicitud>', '<uuid-borrador>');
+```
+
 **C2 · Precio cambiado.** Armamos un borrador del producto 1 (2 unidades a 125945 centavos). Después subimos el precio en el servidor:
 
 ```sql
